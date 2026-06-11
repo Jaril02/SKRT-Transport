@@ -1,0 +1,492 @@
+"use client";
+
+import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import DashboardLayout from "@/components/layout/DashboardLayout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Printer, Download, Save, Plus, CheckCircle2, ArrowLeft } from "lucide-react";
+import api from "@/lib/api";
+import { toast } from "sonner";
+
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+const initialForm = {
+  drNo: "",
+  grNo: "",
+  date: today(),
+  receivedOn: "",
+  from: "",
+  consignee: "",
+  through: "",
+  freight: "",
+  freightPaise: "",
+  labour: "",
+  labourPaise: "",
+  stationery: "5",
+  stationeryPaise: "",
+  commission: "",
+  commissionPaise: "",
+  aoc: "5",
+  aocPaise: "",
+};
+
+type AmountField = "freight" | "labour" | "stationery" | "commission" | "aoc";
+const amountFields: { key: AmountField; label: string }[] = [
+  { key: "freight", label: "Freight" },
+  { key: "labour", label: "Labour" },
+  { key: "stationery", label: "Stationery" },
+  { key: "commission", label: "Commission" },
+  { key: "aoc", label: "A.O.C." },
+];
+
+export default function CashMemoPage() {
+  const router = useRouter();
+  const [form, setForm] = useState(initialForm);
+  const [saving, setSaving] = useState(false);
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  const totalRs = amountFields.reduce((sum, f) => sum + (parseFloat(form[f.key] as string) || 0), 0);
+  const totalWhole = Math.floor(totalRs);
+  const totalPaise = Math.round((totalRs - totalWhole) * 100);
+
+  const set = (field: string, value: string) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
+
+  const [fetchingGr, setFetchingGr] = useState(false);
+
+  const getNextDrNo = async () => {
+    try {
+      const { data } = await api.get("/cash-memo");
+      if (data.success && data.data.length > 0) {
+        let maxNum = 0;
+        for (const cm of data.data) {
+          const num = parseInt(cm.drNo?.toString().replace(/\D/g, ""), 10);
+          if (!isNaN(num) && num > maxNum) maxNum = num;
+        }
+        const nextNum = maxNum + 1;
+        return `DR-${String(nextNum).padStart(3, "0")}`;
+      }
+    } catch {
+      // ignore
+    }
+    return "DR-001";
+  };
+
+  useEffect(() => {
+    (async () => {
+      const next = await getNextDrNo();
+      setForm((prev) => ({ ...prev, drNo: next }));
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!form.grNo.trim()) return;
+    const timer = setTimeout(async () => {
+      setFetchingGr(true);
+      try {
+        const { data } = await api.get(`/entry/grno/${encodeURIComponent(form.grNo.trim())}`);
+        if (data.success) {
+          const e = data.data;
+          setForm(prev => ({
+            ...prev,
+            from: e.from || prev.from,
+            receivedOn: e.sno,
+            consignee: e.consignee || prev.consignee,
+            freight: e.freight || prev.freight,
+          }));
+          toast.success("Entry data loaded for G.R. No.");
+        }
+      } catch {
+        // not found – ignore
+      } finally {
+        setFetchingGr(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [form.grNo]);
+
+  const handleSave = async () => {
+    if (!form.drNo.trim()) { toast.error("D.R. No. is required"); return false; }
+    if (!form.date) { toast.error("Date is required"); return false; }
+    setSaving(true);
+    try {
+      await api.post("/cash-memo", {
+        ...form,
+        freight: parseFloat(form.freight) || 0,
+        freightPaise: parseFloat(form.freightPaise) || 0,
+        labour: parseFloat(form.labour) || 0,
+        labourPaise: parseFloat(form.labourPaise) || 0,
+        stationery: parseFloat(form.stationery) || 0,
+        stationeryPaise: parseFloat(form.stationeryPaise) || 0,
+        commission: parseFloat(form.commission) || 0,
+        commissionPaise: parseFloat(form.commissionPaise) || 0,
+        aoc: parseFloat(form.aoc) || 0,
+        aocPaise: parseFloat(form.aocPaise) || 0,
+        totalAmount: totalRs,
+      });
+      toast.success("Cash memo saved successfully!");
+
+      // Update entry's delivery info
+      if (form.grNo.trim()) {
+        try {
+          const grRes = await api.get(`/entry/grno/${form.grNo.trim()}`);
+          if (grRes.data.success && grRes.data.data) {
+            const entryData = grRes.data.data;
+            const regId = entryData.registerId;
+            const regRes = await api.get(`/entry/${regId}`);
+            if (regRes.data.success && regRes.data.data) {
+              const reg = regRes.data.data;
+              const updatedEntries = (reg.entries || []).map((e: any) => {
+                if (e.grNo === form.grNo.trim()) {
+                  return { ...e, deliveryReceiptNo: form.drNo, dateOfDelivery: form.date };
+                }
+                return e;
+              });
+              await api.put(`/entry/${regId}`, { ...reg, entries: updatedEntries });
+            }
+          }
+        } catch (grErr: any) {
+          if (grErr.response?.status !== 404) {
+            console.error("Failed to update entry delivery info", grErr);
+          }
+        }
+      }
+
+      const next = await getNextDrNo();
+      setForm({ ...initialForm, drNo: next, date: today() });
+      return true;
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to save cash memo");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const r = (v: any) => v || "";
+
+  const buildCashMemoHtml = () => `<!DOCTYPE html>
+<html>
+<head>
+<style>
+    @page { size: A4 portrait; margin: 8mm; }
+    body { font-family: Arial, sans-serif; margin:0; padding:10px; background:#f3f4f6; }
+    .page { border: 2px solid #000; width: 100%; max-width: 700px; padding: 15px; margin: 10px auto; position: relative; background:white; box-sizing:border-box; }
+    .header-top { display: flex; justify-content: space-between; align-items: center; }
+    .dr-no { font-size: 18px; font-weight: bold; color: #333; }
+    .contact { font-size: 14px; font-weight: bold; }
+    .title { text-align: center; font-size: 24px; font-weight: bold; color: #000080; margin-top: 10px; }
+    .subtitle { text-align: center; font-size: 16px; color: #000080; margin-bottom: 20px; }
+    .form-line { display: flex; margin-bottom: 10px; align-items: center; }
+    .label { font-weight: bold; width: 80px; font-size: 13px; }
+    .input-line { border-bottom: 1px solid black; flex-grow: 1; height: 1.2em; }
+    .table-container { border: 1px solid black; margin-top: 20px; width: 100%; }
+    .table-container table { width: 100%; border-collapse: collapse; }
+    .table-container th, .table-container td { text-align: left; padding: 6px; }
+    .table-container th { border-bottom: 1px solid black; font-size: 16px; text-align: center; }
+    .table-container tr { height: 28px; }
+    .signature { text-align: right; margin-top: 30px; font-weight: bold; }
+    @media print { body { background: #fff; padding: 0; } .page { max-width: 100%; margin: 0; border: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+    <div class="header-top">
+        <div class="dr-no">D.R. No. <span style="color:red;">${r(form.drNo)}</span></div>
+        <div class="header-title"><span style="font-weight:bold;font-size:18px;">CASH MEMO</span></div>
+        <div style="font-size:11px; font-weight:bold; text-align: right; color:#000000; line-height: 1.4; padding-right: 10px; white-space: nowrap;">
+            <span>Mob.: 96809-92567</span><br/>
+            <span>Mob.: 86196-06627</span>
+        </div>
+    </div>
+    <div class="title">Sant Kanwar Ram Transport Corp. (BHL.)</div>
+    <div class="subtitle">123-124, Transport Nagar, BHILWARA - 311001 (Raj.)</div>
+    <div class="form-line">
+        <div class="label">G.R. No.</div>
+        <div class="input-line">${r(form.grNo)}</div>
+        <div style="width:110px;text-align:right;font-weight:bold;white-space:nowrap;padding-right:6px;">Received on</div>
+        <div class="input-line" style="width:200px;flex-shrink:0;">${r(form.receivedOn)}</div>
+    </div>
+    <div class="form-line">
+        <div class="label">From</div>
+        <div class="input-line">${r(form.from)}</div>
+        <div style="width:110px;text-align:right;font-weight:bold;white-space:nowrap;padding-right:6px;">Dt.</div>
+          -line" style="width:200px;flex-shrink:0;">${r(form.date)}</div>
+    </div>
+    <div class="form-line">
+        <div class="label">Consignee</div>
+        <div class="input-line">${r(form.consignee)}</div>
+    </div>
+    <div class="form-line">
+        <div class="label">Through</div>
+        <div class="input-line">${r(form.through)}</div>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead><tr><th style="width:70%;"></th><th style="width:15%;">Rs.</th><th style="width:15%;">P.</th></tr></thead>
+            <tbody>
+                <tr><td>Freight</td><td style="border-left:1px solid black;">${r(form.freight)}</td><td style="border-left:1px solid black;">${r(form.freightPaise)}</td></tr>
+                <tr><td>Labour</td><td style="border-left:1px solid black;">${r(form.labour)}</td><td style="border-left:1px solid black;">${r(form.labourPaise)}</td></tr>
+                <tr><td>Stationery</td><td style="border-left:1px solid black;">${r(form.stationery) || "5"}</td><td style="border-left:1px solid black;">${r(form.stationeryPaise) || "00"}</td></tr>
+                <tr><td>Commission</td><td style="border-left:1px solid black;">${r(form.commission)}</td><td style="border-left:1px solid black;">${r(form.commissionPaise)}</td></tr>
+                <tr><td>A.O.C.</td><td style="border-left:1px solid black;">${r(form.aoc) || "5"}</td><td style="border-left:1px solid black;">${r(form.aocPaise) || "0"}</td></tr>
+                <tr style="border-top:1px solid black;">
+                    <td style="font-weight:bold;">Total</td>
+                    <td style="border-left:1px solid black;">${totalWhole}</td>
+                    <td style="border-left:1px solid black;">${String(totalPaise).padStart(2, "0")}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="signature">D. Clerk</div>
+</div>
+</body>
+</html>`
+
+  const handlePrint = () => {
+    const pw = window.open("", "_blank");
+    if (!pw) return;
+    pw.document.write(buildCashMemoHtml());
+    pw.document.close();
+  };
+
+  const handleDownloadPDF = () => {
+    const pw = window.open("", "_blank");
+    if (!pw) return;
+    const html = buildCashMemoHtml().replace("</body>", `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
+<script>window.onload=function(){html2pdf().set({margin:10,filename:'cash-memo.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,letterRendering:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(document.body).save();};<\/script></body>`);
+    pw.document.write(html);
+    pw.document.close();
+  };
+
+  const handleSaveAndPrint = async () => {
+    const success = await handleSave();
+    if (success) {
+      handlePrint();
+    }
+  };
+
+  return (
+    <DashboardLayout>
+      <style>{`
+        @media print {
+          @page { size: A5; margin: 8mm; }
+          body > * { display: none !important; }
+          #cash-memo-printable { display: block !important; }
+          #cash-memo-action-bar { display: none !important; }
+          .sidebar-layout, nav, header, footer { display: none !important; }
+          #cash-memo-printable .receipt {
+            box-shadow: none !important;
+            border: 2px solid #111 !important;
+            background: #fff !important;
+            max-width: 100% !important;
+          }
+          #cash-memo-printable .receipt-inner { border-color: #555 !important; }
+          #cash-memo-printable .memo-title,
+          #cash-memo-printable .company-name,
+          #cash-memo-printable .serial-number { color: #111 !important; text-shadow: none !important; }
+          #cash-memo-printable .field-label,
+          #cash-memo-printable .lbl,
+          #cash-memo-printable .total-lbl,
+          #cash-memo-printable .phones,
+          #cash-memo-printable .dr-block { color: #1a4a8a !important; }
+          #cash-memo-printable input { background: transparent !important; color: #111 !important; border-color: #555 !important; }
+          #cash-memo-printable .total-row td { background: #fff8e1 !important; }
+        }
+      `}</style>
+
+      <div className="space-y-6 px-8 py-8">
+        {/* Page header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.back()}
+              className="h-9 w-9 flex items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition-all"
+              title="Go back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight">Cash Memo</h2>
+              <p className="text-muted-foreground">Manage and generate transport cash memo</p>
+            </div>
+          </div>
+
+          {/* Action bar */}
+          <div id="cash-memo-action-bar" className="flex flex-wrap items-center gap-3 justify-end">
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={saving}
+              className="h-9 px-5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-2 transition-all"
+            >
+              {saving ? <><Save className="h-4 w-4 animate-spin" /> Saving…</> : <><Save className="h-4 w-4" /> Save</>}
+            </Button>
+            <Button
+              size="sm"
+              onClick={handlePrint}
+              className="h-9 px-5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-2 transition-all"
+            >
+              <Printer className="h-4 w-4" /> Print
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSaveAndPrint}
+              disabled={saving}
+              className="h-9 px-5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-2 transition-all"
+            >
+              <Save className="h-4 w-4" /> Save & Print
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleDownloadPDF}
+              className="h-9 px-5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold flex items-center gap-2 transition-all"
+            >
+              <Download className="h-4 w-4" /> Download PDF
+            </Button>
+          </div>
+        </div>
+
+        {/* Receipt card container */}
+        <div className="flex justify-center w-full">
+          <div id="cash-memo-printable" ref={receiptRef} className="receipt w-full max-w-[1100px] rounded-xl border border-slate-800 bg-[#0b1220] shadow-xl font-mono mb-8">
+            <div className="receipt-inner border border-slate-700 m-2 p-6 rounded-lg relative overflow-hidden">
+
+              {/* Top strip */}
+              <div className="flex items-start justify-between border-b border-slate-700 pb-3 mb-4 gap-2">
+                <div className="text-sm font-bold text-[#2388ff] whitespace-nowrap">
+                  D.R.&nbsp;No.&nbsp;
+                  <input
+                    value={form.drNo}
+                    onChange={(e) => set("drNo", e.target.value)}
+                    maxLength={10}
+                    className="w-24 border-0 border-b-2 border-[#2388ff] bg-transparent text-white font-bold text-center text-sm outline-none"
+                  />
+                </div>
+                <div className="flex-1 text-center leading-tight">
+                  <div className="text-2xl font-black text-rose-500 tracking-widest uppercase">
+                    CASH MEMO
+                  </div>
+                </div>
+                <div className="font-size:11px; font-weight:bold; text-align: right; color:#000000; line-height: 1.4; padding-right: 10px; white-space: nowrap;">
+                    <span>Mob.: 96809-92567</span><br/>
+                    <span>Mob.: 86196-06627</span>
+                </div>
+              </div>
+
+              {/* Company header */}
+              <div className="text-center mb-2">
+                <div className="company-name text-lg font-black uppercase tracking-wide text-[#2388ff]">
+                  Sant Kanwar Ram Transport Corp. (BHL)
+                </div>
+                <div className="text-xs text-slate-400 mt-1">
+                  123-124, Transport Nagar, BHILWARA – 311001 (Raj.)
+                </div>
+              </div>
+              <hr className="border-slate-700 my-4" />
+
+              {/* Body */}
+              <div className="flex gap-0 items-start">
+
+                {/* Left: Form fields */}
+                <div className="flex-1 pr-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-x-6">
+                    <div className="flex items-end gap-2">
+                      <span className="text-sm font-bold text-[#2388ff] whitespace-nowrap min-w-[70px]">G.R. No.</span>
+                      <input value={form.grNo} onChange={(e) => set("grNo", e.target.value)} placeholder="GR-4521" className="flex-1 border-0 border-b border-blue-800 bg-transparent text-sm text-white outline-none px-1 py-1 min-w-0 placeholder:text-slate-500 placeholder:italic" />
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <span className="text-sm font-bold text-[#2388ff] whitespace-nowrap min-w-[30px]">Dt.</span>
+                      <input type="date" value={form.date} onChange={(e) => set("date", e.target.value)} className="flex-1 border-0 border-b border-blue-800 bg-transparent text-sm text-white outline-none px-1 py-1 min-w-0" style={{ colorScheme: "dark" }} />
+                    </div>
+                  </div>
+                  {[
+                    { key: "receivedOn", label: "Received on", placeholder: "Truck / Vehicle No." },
+                    { key: "from", label: "From", placeholder: "Origin city / station" },
+                    { key: "consignee", label: "Consignee", placeholder: "Recipient name & address" },
+                    { key: "through", label: "Through", placeholder: "Via / Agent name" },
+                  ].map(({ key, label, placeholder }) => (
+                    <div key={key} className="flex items-end gap-2">
+                      <span className="text-sm font-bold text-[#2388ff] whitespace-nowrap min-w-[90px]">{label}</span>
+                      <input
+                        value={(form as any)[key]}
+                        onChange={(e) => set(key, e.target.value)}
+                        placeholder={placeholder}
+                        className="flex-1 border-0 border-b border-blue-800 bg-transparent text-sm text-white outline-none px-1 py-1 min-w-0 placeholder:text-slate-500 placeholder:italic"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Right: Amount table */}
+                <div className="flex-shrink-0 w-[240px]">
+                  <table className="w-full border-collapse text-sm" style={{ tableLayout: "fixed" }}>
+                    <caption className="text-xs font-bold text-center text-white border border-slate-700 border-b-0 bg-slate-800 py-1.5 px-2">Amount</caption>
+                    <thead>
+                      <tr>
+                        <th className="border border-slate-700 bg-slate-800 text-[#2388ff] font-extrabold text-left text-xs px-2 py-1.5 w-[48%]">Head</th>
+                        <th className="border border-slate-700 bg-slate-800 text-[#2388ff] font-extrabold text-center text-xs px-2 py-1.5 w-[30%]">Rs.</th>
+                        <th className="border border-slate-700 bg-slate-800 text-[#2388ff] font-extrabold text-center text-xs px-2 py-1.5 w-[22%]">P.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {amountFields.map(({ key, label }) => (
+                        <tr key={key}>
+                          <td className="lbl border border-slate-700 px-2 py-1 font-semibold text-slate-300 text-left">{label}</td>
+                          <td className="border border-slate-700 px-1 py-1 bg-slate-900/50">
+                            <input
+                              type="number"
+                              min="0"
+                              value={(form as any)[key]}
+                              onChange={(e) => set(key, e.target.value)}
+                              placeholder="0"
+                              className="w-full border-0 bg-transparent text-right text-sm text-white outline-none placeholder:text-slate-600"
+                            />
+                          </td>
+                          <td className="border border-slate-700 px-1 py-1 bg-slate-900/50">
+                            <input
+                              type="number"
+                              min="0"
+                              max="99"
+                              value={(form as any)[`${key}Paise`]}
+                              onChange={(e) => set(`${key}Paise`, e.target.value)}
+                              placeholder="00"
+                              className="w-full border-0 bg-transparent text-right text-sm text-white outline-none placeholder:text-slate-600"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="total-row">
+                        <td className="total-lbl border border-slate-700 px-2 py-1.5 bg-slate-800 font-black text-white">Total</td>
+                        <td className="border border-slate-700 px-2 py-1.5 bg-slate-800 text-right font-black text-[#2388ff]">{totalWhole}</td>
+                        <td className="border border-slate-700 px-2 py-1.5 bg-slate-800 text-right font-black text-[#2388ff]">{String(totalPaise).padStart(2, "0")}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Bottom row */}
+              <div className="flex justify-end items-end mt-8 pt-4 border-t border-blue-900/50">
+                <div className="text-sm font-bold text-slate-400 text-center">
+                  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                  <span className="block border-t border-slate-600 mt-6 pt-1">D. Clerk</span>
+                </div>
+              </div>
+
+              {/* Watermark */}
+              <div className="absolute inset-0 flex items-end justify-center pointer-events-none overflow-hidden" aria-hidden>
+                <span className="text-[52px] font-black tracking-[6px] uppercase select-none" style={{ color: "rgba(0,180,255,.04)" }}>Transport</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+}

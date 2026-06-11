@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: oklch(0.12 0.02 260); /* Deep midnight blue */
+  --color-foreground: oklch(0.98 0.01 260);
+  --color-primary: oklch(0.65 0.25 260); /* Vibrant blue */
+  --color-primary-foreground: oklch(0.98 0.01 260);
+  --color-secondary: oklch(0.2 0.05 260);
+  --color-accent: oklch(0.7 0.2 150); /* Logistics green */
+  --color-muted: oklch(0.3 0.05 260);
+  --color-border: oklch(0.25 0.05 260);
+  
+  --radius-lg: 1rem;
+  --radius-md: 0.75rem;
+  --radius-sm: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+.glassmorphism {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
