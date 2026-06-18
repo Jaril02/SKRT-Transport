@@ -39,7 +39,8 @@ export default function DeliveryStatementPage() {
   const [dateSearch] = useState(() => new Date().toISOString().slice(0, 10));
 
   const [matchCount, setMatchCount] = useState(0);
-  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [waPhone, setWaPhone] = useState("");
+  const [sendingWa, setSendingWa] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(false);
@@ -290,16 +291,15 @@ export default function DeliveryStatementPage() {
   };
 
   const handleShareWhatsApp = async () => {
-    setSendingWhatsApp(true);
+    if (!waPhone.trim()) { toast.error("Enter a WhatsApp number"); return; }
+    setSendingWa(true);
     try {
-      const phone = prompt("Enter WhatsApp number to send this Delivery Statement:");
-      if (!phone) { setSendingWhatsApp(false); return; }
       const html = await buildDsHtml();
-      await generateAndSendPDF(phone, html, `delivery-statement-${dateSearch}.pdf`, "landscape");
+      await generateAndSendPDF(waPhone, html, `delivery-statement-${dateSearch}.pdf`, "landscape");
     } catch {
       // error handled by generateAndSendPDF
     } finally {
-      setSendingWhatsApp(false);
+      setSendingWa(false);
     }
   };
 
@@ -422,10 +422,18 @@ export default function DeliveryStatementPage() {
             <Button size="sm" onClick={handleDownloadPDF} className="h-9 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold transition-all">
               <Download className="h-4 w-4 mr-1.5" /> Download PDF
             </Button>
-            <Button size="sm" onClick={handleShareWhatsApp} disabled={sendingWhatsApp} className="h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-all">
-              {sendingWhatsApp ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <MessageCircle className="h-4 w-4 mr-1.5" />}
-              {sendingWhatsApp ? "Sending..." : "WhatsApp"}
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={waPhone}
+                onChange={(e) => setWaPhone(e.target.value)}
+                placeholder="Phone"
+                className="h-9 w-28 bg-slate-800 border border-slate-700 rounded-lg px-2.5 text-xs text-white outline-none placeholder:text-slate-500"
+              />
+              <Button size="sm" onClick={handleShareWhatsApp} disabled={sendingWa || !waPhone.trim()} className="h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-all">
+                {sendingWa ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
         </div>
 
