@@ -34,5 +34,7 @@ Thumbs.db
 # Vercel
 .vercel/
 
+.wwebjs_auth/
+.wwebjs_cache/
 
 *.md
