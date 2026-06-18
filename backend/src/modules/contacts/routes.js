@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { getContacts, createContact } = require('./controller');
-const { protect, authorize } = require('../../middleware/authMiddleware');
+const { protect } = require('../../middleware/authMiddleware');
+const { requirePermission } = require('../../middleware/permissionMiddleware');
 
 router.route('/')
   .get(protect, getContacts)
-  .post(protect, authorize('admin', 'manager', 'operator'), createContact);
+  .post(protect, requirePermission('contacts', 'create'), createContact);
 
 module.exports = router;

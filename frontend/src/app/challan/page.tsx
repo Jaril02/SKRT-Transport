@@ -4,11 +4,13 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Printer, Download, Save, Plus, X, Loader2, ArrowLeft, Search as SearchIcon } from "lucide-react";
+import { Printer, Download, Save, Plus, X, Loader2, ArrowLeft, Search as SearchIcon, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { useHeader } from "@/context/HeaderContext";
+import { fetchTemplate, fillTemplate } from "@/lib/template-utils";
+import { generateAndSendPDF } from "@/lib/whatsapp";
 
 const today = () => {
   const d = new Date();
@@ -95,6 +97,8 @@ export default function ChallanPage() {
 
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [waPhone, setWaPhone] = useState("");
+  const [sendingWa, setSendingWa] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
   const getNextChallanNo = useCallback(async (): Promise<string> => {
@@ -206,13 +210,11 @@ export default function ChallanPage() {
   const totalWt = rows.reduce((sum, r) => sum + (parseFloat(r.wt) || 0), 0);
 
   const rowsTotal = rows.reduce((sum, r) => sum + (parseFloat(r.total) || 0), 0);
-  const chargeSum =
-    (parseFloat(charges.commission) || 0) +
-    (parseFloat(charges.labour) || 0) +
-    (parseFloat(charges.gr) || 0) +
-    (parseFloat(charges.crossing) || 0);
+  const chargeFields = ['commission','labour','gr','crossing','truckFreight','advance','tfCredit','totalToPay','otherCharge','lcdc','crossing2','balanceFreight'];
+  const totalDeductions = chargeFields.reduce((sum, f) => sum + (parseFloat((charges as any)[f]) || 0), 0);
+  const doorDelivery = parseFloat(charges.doorDelivery) || 0;
 
-  const grandTotal = rowsTotal + chargeSum;
+  const grandTotal = rowsTotal - totalDeductions + doorDelivery;
 
   const handleSave = async () => {
     setSaving(true);
@@ -268,7 +270,7 @@ export default function ChallanPage() {
     }
   };
 
-  const buildChallanHtml = () => {
+  const buildChallanHtml = async (): Promise<string> => {
     const r = (v: any) => v || "";
     const formatDate = (ds: string) => {
       if (!ds) return "";
@@ -289,115 +291,60 @@ export default function ChallanPage() {
       </tr>
     `).join("");
 
-    return `<!DOCTYPE html>
-<html>
-<head>
-<style>
-    body { font-family: Arial, sans-serif; margin:0; padding:20px; background:#f3f4f6; }
-    .challan { border: 2px solid #000; width: 190mm; min-height: 120mm; padding: 5mm; margin: 10mm auto; position: relative; background:white; font-size: 12px; box-sizing:border-box; }
-    .header-top { display: flex; justify-content: space-between; align-items: center; }
-    .jurisdiction { text-align: center; font-size: 11px; font-weight: bold; color: #000080; margin-bottom: 5px; }
-    .title { text-align: center; font-size: 22px; font-weight: bold; color: #000080; }
-    .subtitle { text-align: center; font-size: 14px; color: #000080; margin-bottom: 15px; }
-    .fields { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
-    .field-group { display: flex; align-items: center; flex: 1; min-width: 200px; }
-    .field-label { font-weight: bold; white-space: nowrap; margin-right: 6px; }
-    .field-value { border-bottom: 1px solid black; flex: 1; padding: 2px 4px; }
-    .notice { font-size: 11px; padding: 6px; border-left: 3px solid #000080; margin-bottom: 15px; font-style: italic; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid black; padding: 6px; font-size: 10px; }
-    th { background: #f0f0f0; font-weight: bold; text-align: center; text-transform: uppercase; }
-    .totals-box { display: flex; justify-content: space-between; border: 2px solid #333; padding: 12px; margin: 15px 0; }
-    .totals-item { text-align: center; flex: 1; }
-    .totals-item .num { font-size: 22px; font-weight: bold; color: #8b0000; }
-    .footer-row { display: flex; justify-content: space-between; align-items: end; margin-top: 20px; font-size: 12px; }
-    .signature-line { border-top: 1px solid black; padding-top: 4px; text-align: center; }
-</style>
-</head>
-<body>
-<div class="challan">
-    <div class="jurisdiction">Subject to BHILWARA  Jurisdiction</div>
-    <div class="header-top" style="display: flex; justify-content: space-between; align-items: start; width: 100%; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 8px;">
-        <div style="font-size:12px; font-weight:bold; color:#111; line-height: 1.5; text-align: left;">
-            <div style="font-size:14px; font-weight:900; color: #000;">Challan No. ${r(challanNo)}</div>
-            <div style="margin-top: 4px;">Date: ${formatDate(date)}</div>
-        </div>
-        <div style="text-align: center; flex-grow: 1; padding: 0 20px;">
-            <div class="title" style="font-size: 22px; font-weight: 900; color: #000080; letter-spacing: 0.5px;">Sant Kanwar Ram Transport Corp. (BHL.)</div>
-            <div style="font-size: 11px; font-weight: bold; color: #555; margin-top: 3px;">123-124, Transport Nagar, BHILWARA - 311001 (Raj.)</div>
-        </div>
-        <div style="font-size:11px; font-weight:bold; text-align: right; color:#000080; line-height: 1.4; padding-right: 10px; white-space: nowrap;">
-            <span>Mob.: 96809-92567</span><br/>
-            <span>Mob.: 86196-06627</span>
-        </div>
-    </div>
-    <div class="fields" style="margin-top: 15px; display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
-        <div class="field-group" style="flex: 1; min-width: 200px;"><span class="field-label">From BHILWARA to</span><span class="field-value">${r(from)}</span></div>
-        <div class="field-group" style="flex: 1; min-width: 200px;"><span class="field-label">Vehicle No.</span><span class="field-value">${r(vehicleNo)}</span></div>
-        <div class="field-group" style="flex: 1; min-width: 200px;"><span class="field-label">Owner's Name</span><span class="field-value">${r(ownerName)}</span></div>
-        <div class="field-group" style="flex: 2; min-width: 200px;"><span class="field-label">Driver's Name</span><span class="field-value">${r(driverName)}</span></div>
-    </div>
-    <div class="notice">Driver of this vehicle is responsible for goods which is loaded in this truck for safe &amp; sound delivery as per conditions mentioned overleaf.</div>
-    <table>
-        <thead>
-            <tr>
-          <th style="width:4%;">S. No.</th>
-          <th style="width:9%;">G.R. No.</th>
-          <th style="width:7%;">Pkg.</th>
-          <th style="width:14%;">Destination</th>
-          <th style="width:14%;">Content</th>
-          <th style="width:16%;">Consignor</th>
-          <th style="width:16%;">Consignee</th>
-          <th style="width:8%;">Total (Rs.)</th>
-          <th style="width:7%;">Wt.</th>
-            </tr>
-        </thead>
-        <tbody>${tableRows}</tbody>
-    </table>
-    <div class="totals-box">
-        <div class="totals-item"><div>Total Packages</div><div class="num">${totalPkg}</div></div>
-        <div class="totals-item"><div>Total Weight</div><div class="num">${totalWt.toFixed(1)}</div></div>
-        <div class="totals-item"><div>Grand Total (Rs.)</div><div class="num">${grandTotal.toFixed(2)}</div></div>
-    </div>
-    <div style="font-size:11px;margin-bottom:12px;padding:8px 12px;border:1px solid #ccc;border-radius:4px;">
-        <div style="padding:3px 0;"><strong>Truck Freight:</strong> ${r(charges.truckFreight)}</div>
-        <div style="padding:3px 0;"><strong>Advance:</strong> ${r(charges.advance)}</div>
-        <div style="padding:3px 0;"><strong>T.F Credit:</strong> ${r(charges.tfCredit)}</div>
-        <div style="padding:3px 0;"><strong>Total To Pay:</strong> ${r(charges.totalToPay)}</div>
-        <div style="padding:3px 0;"><strong>Other Charge:</strong> ${r(charges.otherCharge)}</div>
-        <div style="padding:3px 0;"><strong>LC/DC:</strong> ${r(charges.lcdc)}</div>
-        <div style="padding:3px 0;"><strong>Crossing:</strong> ${r(charges.crossing2)}</div>
-        <div style="padding:3px 0;"><strong>Door Delivery:</strong> ${r(charges.doorDelivery)}</div>
-        <div style="padding:3px 0;"><strong>Balance Freight:</strong> ${r(charges.balanceFreight)}</div>
-        <div style="padding:3px 0;"><strong>Note:</strong> ${r(charges.note)}</div>
-    </div>
-    <div style="font-size:11px;margin-bottom:15px;">Quantity &amp; Goods of this memo received in safe and sound condition</div>
-    <div class="footer-row">
-        <div>GST No. : <strong>08AAHPN5613K1ZH</strong></div>
-        <div>
-            <div style="text-align:right;font-weight:bold;">FOR : Sant Kanwar Ram Transport Corp. (BHL.)</div>
-            <div class="signature-line" style="width:200px;margin-left:auto;margin-top:8px;">Owner or Driver's Signature</div>
-        </div>
-    </div>
-</div>
-</body>
-</html>`;
+    const template = await fetchTemplate("challan");
+    return fillTemplate(template, {
+      CHALLAN_NO: r(challanNo),
+      DATE: formatDate(date),
+      FROM: r(from),
+      VEHICLE_NO: r(vehicleNo),
+      OWNER_NAME: r(ownerName),
+      DRIVER_NAME: r(driverName),
+      TABLE_ROWS: tableRows,
+      TOTAL_PKG: String(totalPkg),
+      TOTAL_WT: totalWt.toFixed(1),
+      GRAND_TOTAL: grandTotal.toFixed(2),
+      TRUCK_FREIGHT: r(charges.truckFreight),
+      ADVANCE: r(charges.advance),
+      TF_CREDIT: r(charges.tfCredit),
+      TOTAL_TO_PAY: r(charges.totalToPay),
+      OTHER_CHARGE: r(charges.otherCharge),
+      LCDC: r(charges.lcdc),
+      CROSSING: r(charges.crossing2),
+      DOOR_DELIVERY: r(charges.doorDelivery),
+      BALANCE_FREIGHT: r(charges.balanceFreight),
+      CHARGES_NOTE: r(charges.note),
+    });
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    const html = await buildChallanHtml();
     const pw = window.open("", "_blank");
     if (!pw) return;
-    pw.document.write(buildChallanHtml());
-    pw.document.close();
-  };
-
-  const handleDownloadPDF = () => {
-    const pw = window.open("", "_blank");
-    if (!pw) return;
-    const html = buildChallanHtml().replace("</body>", `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
-<script>window.onload=function(){html2pdf().set({margin:10,filename:'challan.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,letterRendering:true},jsPDF:{unit:'mm',format:'a4',orientation:'landscape'}}).from(document.body).save();};<\/script></body>`);
     pw.document.write(html);
     pw.document.close();
+  };
+
+  const handleDownloadPDF = async () => {
+    const html = await buildChallanHtml();
+    const pw = window.open("", "_blank");
+    if (!pw) return;
+    const pdfHtml = html.replace("</body>", `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
+<script>window.onload=function(){html2pdf().set({margin:10,filename:'challan.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,letterRendering:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(document.body).save();};<\/script></body>`);
+    pw.document.write(pdfHtml);
+    pw.document.close();
+  };
+
+  const handleWhatsApp = async () => {
+    if (!waPhone.trim()) { toast.error("Enter a WhatsApp number"); return; }
+    setSendingWa(true);
+    try {
+      const html = await buildChallanHtml();
+      await generateAndSendPDF(waPhone, html, `challan-${challanNo}.pdf`, "portrait");
+    } catch {
+      // handled by generateAndSendPDF
+    } finally {
+      setSendingWa(false);
+    }
   };
 
   return (
@@ -427,7 +374,7 @@ export default function ChallanPage() {
         }
       `}</style>
 
-      <div className="space-y-6 px-8 py-8">
+      <div className="space-y-6 px-4 md:px-8 py-4 md:py-8">
         {/* Page header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -471,6 +418,23 @@ export default function ChallanPage() {
             >
               <Download className="h-4 w-4" /> Download PDF
             </Button>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={waPhone}
+                onChange={(e) => setWaPhone(e.target.value)}
+                placeholder="Phone"
+                className="h-9 w-28 bg-slate-800 border border-slate-700 rounded-lg px-2.5 text-xs text-white outline-none placeholder:text-slate-500"
+              />
+              <Button
+                size="sm"
+                onClick={handleWhatsApp}
+                disabled={sendingWa || !waPhone.trim()}
+                className="h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-1.5 transition-all"
+              >
+                {sendingWa ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
         </div>
 

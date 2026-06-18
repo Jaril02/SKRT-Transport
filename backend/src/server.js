@@ -32,6 +32,10 @@ io.on('connection', (socket) => {
 // Attach io to app so it can be used in controllers
 app.set('io', io);
 
+// Initialize WhatsApp client
+const whatsappService = require('./modules/whatsapp/service');
+whatsappService.initialize();
+
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {

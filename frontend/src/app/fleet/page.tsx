@@ -22,6 +22,10 @@ import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { useHeader } from "@/context/HeaderContext";
 import { toast } from "sonner";
+import { generateAndSendPDF } from "@/lib/whatsapp";
+import { fetchCashMemoTemplate, fillCashMemoTemplate } from "@/lib/cash-memo-template";
+import { buildSummaryPrintHtml } from "@/lib/summary-html";
+import { fetchTemplate, fillTemplate } from "@/lib/template-utils";
 import {
   Dialog,
   DialogContent,
@@ -80,6 +84,8 @@ export default function FleetPage() {
   const [previewData, setPreviewData] = useState<any>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewEntryIndex, setPreviewEntryIndex] = useState<number | null>(null);
+  const [waPhone, setWaPhone] = useState("");
+  const [sendingWa, setSendingWa] = useState(false);
   const getRecordDate = (module: ModuleKey, reg: any) => {
     let dateVal = "";
     if (module === "challan") dateVal = reg.date || reg.dateSearch || reg._regDate || "";
@@ -407,7 +413,7 @@ export default function FleetPage() {
         memo.totalAmount || 0
       ]);
     } else if (activeModule === "summary") {
-      headers = ["Date", "S.No", "Truck No", "Driver", "From", "To", "Transport", "Challan No", "Fare Del.", "Crossing", "Cross Fare", "Labor", "Del. Comm.", "Credit", "Debit", "Grand Total", "Note"];
+      headers = ["Date", "S.No", "Truck No", "Driver", "From", "To", "Transport", "Challan No", "Fare Del.", "Crossing", "Cross Fare", "Labor", "Del. Comm.", "Credit", "Debit", "Grand Total", "Note", "Note 2"];
       const flat = filteredRegs.flatMap((reg: any) =>
         (reg.entries || []).map((e: any) => flattenRow(reg, e))
       );
@@ -428,10 +434,11 @@ export default function FleetPage() {
         r.credit || "",
         r.debit || "",
         r.grandTotal || "",
-        r.note || ""
+        r.note || "",
+        r.note2 || ""
       ]);
     } else if (activeModule === "delivery-statement") {
-      headers = ["Date", "Page No", "S.No", "D.R. No", "Freight", "Labour", "Stationery", "D. Com", "Demurage", "Total"];
+      headers = ["Date", "Page No", "S.No", "D.R. No", "Freight", "Labour", "Stationery", "Commission", "A.O.C", "Total"];
       const flat = filteredRegs.flatMap((reg: any) =>
         (reg.entries || []).map((e: any) => flattenRow(reg, e))
       );
@@ -634,6 +641,7 @@ export default function FleetPage() {
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Debit</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Grand Total</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Note</th>
+              <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Note 2</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold w-8"></th>
             </tr>
           </thead>
@@ -662,6 +670,7 @@ export default function FleetPage() {
                 <td className="border border-slate-700 p-2 text-right text-rose-400">{row.debit || "—"}</td>
                 <td className="border border-slate-700 p-2 text-right text-amber-400 font-bold">{row.grandTotal || "—"}</td>
                 <td className="border border-slate-700 p-2 text-left text-slate-300 max-w-[150px] truncate" title={row.note}>{row.note || "—"}</td>
+                <td className="border border-slate-700 p-2 text-left text-slate-300 max-w-[150px] truncate" title={row.note2}>{row.note2 || "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -692,8 +701,8 @@ export default function FleetPage() {
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Freight</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Labour</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Stationery</th>
-              <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">D. Com</th>
-              <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Demurage</th>
+              <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Commission</th>
+              <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">A.O.C</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Total</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold w-8"></th>
             </tr>
@@ -1024,6 +1033,75 @@ export default function FleetPage() {
               For Sant Kanwar Ram Transport Corp. (BHL.)
             </div>
           </div>
+          <div className="mt-4 flex items-center gap-2 print-hide">
+            <input
+              type="tel"
+              placeholder="Phone number"
+              value={waPhone}
+              onChange={(e) => setWaPhone(e.target.value)}
+              className="flex-1 max-w-[180px] px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#2388ff]"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={sendingWa || !waPhone.trim()}
+              onClick={async () => {
+                if (!waPhone.trim()) { toast.error("Enter a phone number"); return; }
+                setSendingWa(true);
+                try {
+                  const template = await fetchTemplate("challan");
+                  const entries = previewEntryIndex !== null && previewData.entries ? [previewData.entries[previewEntryIndex]] : previewData.entries || [];
+                  const r = (v: any) => v || "";
+                  const formatDate = (ds: string) => {
+                    if (!ds) return "";
+                    const p = ds.split("T")[0].split("-");
+                    return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : ds;
+                  };
+                  const tableRows = entries.map((e: any, idx: number) =>
+                    `<tr><td style="text-align:center;">${idx + 1}</td><td style="text-align:center;">${r(e.grNo)}</td><td style="text-align:center;">${r(e.pkg)}</td><td>${r(e.dest)}</td><td>${r(e.content)}</td><td>${r(e.consignor)}</td><td>${r(e.consignee)}</td><td style="text-align:right;">${r(e.total)}</td><td style="text-align:right;">${r(e.wt)}</td></tr>`
+                  ).join("");
+                  const totalPkg = entries.reduce((s: number, e: any) => s + (parseInt(e.pkg) || 0), 0);
+                  const totalWt = entries.reduce((s: number, e: any) => s + (parseFloat(e.wt) || 0), 0);
+                  const rowsTotal = entries.reduce((s: number, e: any) => s + (parseFloat(e.total) || 0), 0);
+                  const c = previewData.charges || previewData;
+                  const chargeFields = ['commission','labour','gr','crossing','truckFreight','advance','tfCredit','totalToPay','otherCharge','lcdc','crossing2','balanceFreight'];
+                  const totalDeductions = chargeFields.reduce((sum: number, f: string) => sum + (parseFloat((c as any)[f]) || 0), 0);
+                  const doorDelivery = parseFloat(c.doorDelivery) || 0;
+                  const grandTotal = rowsTotal - totalDeductions + doorDelivery;
+                  const html = fillTemplate(template, {
+                    CHALLAN_NO: r(previewData.challanNo),
+                    DATE: formatDate(previewData.date),
+                    FROM: r(previewData.from),
+                    VEHICLE_NO: r(previewData.vehicleNo),
+                    OWNER_NAME: r(previewData.ownerName),
+                    DRIVER_NAME: r(previewData.driverName),
+                    TABLE_ROWS: tableRows,
+                    TOTAL_PKG: String(totalPkg),
+                    TOTAL_WT: totalWt.toFixed(1),
+                    GRAND_TOTAL: grandTotal.toFixed(2),
+                    TRUCK_FREIGHT: r(c.truckFreight),
+                    ADVANCE: r(c.advance),
+                    TF_CREDIT: r(c.tfCredit),
+                    TOTAL_TO_PAY: r(c.totalToPay),
+                    OTHER_CHARGE: r(c.otherCharge),
+                    LCDC: r(c.lcdc),
+                    CROSSING: r(c.crossing2),
+                    DOOR_DELIVERY: r(c.doorDelivery),
+                    BALANCE_FREIGHT: r(c.balanceFreight),
+                    CHARGES_NOTE: r(c.note),
+                  });
+                  await generateAndSendPDF(waPhone, html, `challan-${previewData.challanNo || "doc"}.pdf`, "portrait");
+                } catch {}
+                setSendingWa(false);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 font-semibold"
+            >
+              {sendingWa ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : (
+                <svg className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              )}
+              WhatsApp
+            </Button>
+          </div>
         </div>
       );
     }
@@ -1102,6 +1180,48 @@ export default function FleetPage() {
             </table>
           </div>
           <div className="text-right mt-6 text-sm text-slate-400 font-bold">D. Clerk</div>
+          <div className="mt-4 flex justify-end print-hide">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                const phone = window.prompt("Enter phone number to send via WhatsApp:");
+                if (!phone) return;
+                try {
+                  const template = await fetchCashMemoTemplate();
+                  const totalRs = freightRs + labourRs + stationeryRs + commissionRs + aocRs;
+                  const totalWhole = Math.floor(totalRs);
+                  const totalPaiseVal = Math.round((totalRs - totalWhole) * 100) + freightP + labourP + stationeryP + commissionP + aocP;
+                  const html = fillCashMemoTemplate(template, {
+                    drNo: previewData.drNo,
+                    grNo: previewData.grNo,
+                    date: previewData.date ? (() => { const p = previewData.date.split("T")[0].split("-"); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : previewData.date; })() : "",
+                    receivedOn: previewData.receivedOn,
+                    from: previewData.from,
+                    consignee: previewData.consignee,
+                    through: previewData.through,
+                    freight: String(freightRs),
+                    freightP: String(freightP),
+                    labour: String(labourRs),
+                    labourP: String(labourP),
+                    stationery: String(stationeryRs || 5),
+                    stationeryP: String(stationeryP || "00"),
+                    commission: String(commissionRs),
+                    commissionP: String(commissionP),
+                    aoc: String(aocRs || 5),
+                    aocP: String(aocP),
+                    total: String(totalWhole),
+                    totalP: String(totalPaiseVal).padStart(2, "0"),
+                  });
+                  await generateAndSendPDF(phone, html, `cash-memo-${previewData.drNo || "memo"}.pdf`);
+                } catch {}
+              }}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 font-semibold"
+            >
+              <svg className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              WhatsApp
+            </Button>
+          </div>
         </div>
       );
     }
@@ -1118,8 +1238,7 @@ export default function FleetPage() {
             const labor = parseFloat(e.labor) || 0;
             const credit = parseFloat(e.credit) || 0;
             const debit = parseFloat(e.debit) || 0;
-            const subtotal = fareDelivery + crossingFare + deliveryCommission - crossing - labor;
-            const total = subtotal + credit - debit;
+            const total = fareDelivery + crossingFare + deliveryCommission - crossing - labor;
             
             return (
               <div 
@@ -1128,8 +1247,8 @@ export default function FleetPage() {
                 style={{ background: "linear-gradient(145deg, #1b0c10 0%, #0c0406 100%)" }}
               >
                 <div className="p-6">
-                  <div className="flex justify-between text-[9px] text-[#ffaec1]/60 font-semibold mb-1 uppercase tracking-wide">
-                    <span>Mob. 96809-92567</span>
+                  <div className="flex flex-col items-end text-[9px] text-[#ffaec1]/60 font-semibold mb-1 uppercase tracking-wide">
+                    <span>Mob. 96809-92567</span><br/>
                     <span>Mob. 86196-06627</span>
                   </div>
                   <div className="text-center text-[9px] text-slate-500/80 mb-3 italic tracking-wide">
@@ -1189,6 +1308,8 @@ export default function FleetPage() {
                       <div className="flex justify-between text-rose-400"><span>Debit:</span> <span className="font-mono">₹ {e.debit || "0"}</span></div>
                     </div>
                     
+                    {e.note2 && <div className="text-[10.5px] italic text-[#ffaec1]/85 mt-1 border-t border-[#ffaec1]/10 pt-1">Note: {e.note2}</div>}
+                    
                     <div className="h-px bg-[#ffaec1]/20 my-2" />
                     <div className="flex justify-between items-center text-[#ffaec1] font-extrabold text-base">
                       <span>GRAND TOTAL:</span>
@@ -1199,6 +1320,25 @@ export default function FleetPage() {
               </div>
             );
           })}
+          <div className="flex justify-end print-hide">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                const phone = window.prompt("Enter phone number to send via WhatsApp:");
+                if (!phone) return;
+                try {
+                  const entriesToUse = previewEntryIndex !== null && previewData.entries ? [previewData.entries[previewEntryIndex]] : previewData.entries || [];
+                  const html = buildSummaryPrintHtml(entriesToUse, previewData.date || "");
+                  await generateAndSendPDF(phone, html, `summary-${previewData.date || "register"}.pdf`);
+                } catch {}
+              }}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 font-semibold"
+            >
+              <svg className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              WhatsApp
+            </Button>
+          </div>
         </div>
       );
     }
@@ -1258,6 +1398,54 @@ export default function FleetPage() {
             <div><p className="text-slate-500 uppercase">Tot Demurage</p><p className="text-white font-extrabold text-sm mt-0.5">₹ {previewData.totals?.demurage || 0}</p></div>
           </div>
           <div className="mt-4 text-right"><span className="text-xs font-bold text-rose-400 uppercase tracking-widest">DS Total: </span><span className="text-rose-500 font-black text-xl ml-2">₹ {previewData.totals?.total || 0}</span></div>
+          <div className="mt-4 flex items-center gap-2 print-hide">
+            <input
+              type="tel"
+              placeholder="Phone number"
+              value={waPhone}
+              onChange={(e) => setWaPhone(e.target.value)}
+              className="flex-1 max-w-[180px] px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-rose-500"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={sendingWa || !waPhone.trim()}
+              onClick={async () => {
+                if (!waPhone.trim()) { toast.error("Enter a phone number"); return; }
+                setSendingWa(true);
+                try {
+                  const template = await fetchTemplate("delivery_statement");
+                  const entries = previewData.entries || [];
+                  const r = (v: any) => v || "";
+                  const tableRows = entries.map((e: any, idx: number) => {
+                    const total = (parseFloat(e.freight) || 0) + (parseFloat(e.labour) || 0) + (parseFloat(e.receiptCh) || 0) + (parseFloat(e.dCom) || 0) + (parseFloat(e.demurage) || 0);
+                    return `<tr><td class="tc">${e.sno || idx + 1}</td><td class="tc">${r(e.drNo)}</td><td class="tr">${r(e.freight)}</td><td class="tr">${r(e.labour)}</td><td class="tr">${r(e.receiptCh)}</td><td class="tr">${r(e.dCom)}</td><td class="tr">${r(e.demurage)}</td><td class="tr"><strong>${total.toFixed(2)}</strong></td></tr>`;
+                  }).join("");
+                  const totFreight = previewData.totals?.freight || 0;
+                  const totLabour = previewData.totals?.labour || 0;
+                  const totReceipt = previewData.totals?.receiptCh || 0;
+                  const totDCom = previewData.totals?.dCom || 0;
+                  const totDemurage = previewData.totals?.demurage || 0;
+                  const totAll = previewData.totals?.total || 0;
+                  const totalsRow = `<tr style="font-weight:bold;background:#e8ecf0;"><td class="tc">Total</td><td></td><td class="tr">${totFreight}</td><td class="tr">${totLabour}</td><td class="tr">${totReceipt}</td><td class="tr">${totDCom}</td><td class="tr">${totDemurage}</td><td class="tr">${totAll}</td></tr>`;
+                  const html = fillTemplate(template, {
+                    DATE: r(previewData.dateSearch),
+                    PAGE_NO: r(previewData.pageNo),
+                    TABLE_ROWS: tableRows,
+                    TOTALS_ROW: totalsRow,
+                  });
+                  await generateAndSendPDF(waPhone, html, `delivery-statement-${previewData.pageNo || "doc"}.pdf`, "landscape");
+                } catch {}
+                setSendingWa(false);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 font-semibold"
+            >
+              {sendingWa ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : (
+                <svg className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              )}
+              WhatsApp
+            </Button>
+          </div>
         </div>
       );
     }
@@ -1325,6 +1513,48 @@ export default function FleetPage() {
               </tbody>
             </table>
           </div>
+          <div className="mt-4 flex items-center gap-2 print-hide">
+            <input
+              type="tel"
+              placeholder="Phone number"
+              value={waPhone}
+              onChange={(e) => setWaPhone(e.target.value)}
+              className="flex-1 max-w-[180px] px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-violet-500"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={sendingWa || !waPhone.trim()}
+              onClick={async () => {
+                if (!waPhone.trim()) { toast.error("Enter a phone number"); return; }
+                setSendingWa(true);
+                try {
+                  const template = await fetchTemplate("delivery_register");
+                  const entries = previewData.entries || [];
+                  const tableRows = entries.map((e: any, idx: number) =>
+                    `<tr><td class="text-center">${e.sno || idx + 1}</td><td>${e.from || ""}</td><td>${e.to || ""}</td><td>${e.grNo || ""}</td><td>${e.consignor || ""}</td><td>${e.consignee || ""}</td><td class="text-center">${e.noOfPackages || ""}</td><td>${e.contents || ""}</td><td class="text-right">${e.freight || ""}</td><td>${e.deliveryReceiptNo || ""}</td><td>${e.dateOfDelivery || ""}</td></tr>`
+                  ).join("");
+                  const html = fillTemplate(template, {
+                    CHALLAN_NO: previewData.challanNo || "—",
+                    FROM: previewData.fromData || "—",
+                    TO: previewData.toData || "—",
+                    VEHICLE_NO: previewData.vehicleNo || "—",
+                    DATE: previewData.dateSearch || "—",
+                    PAGE_NO: previewData.pageNo || "—",
+                    TABLE_ROWS: tableRows,
+                  });
+                  await generateAndSendPDF(waPhone, html, `delivery-register-${previewData.challanNo || "doc"}.pdf`, "landscape");
+                } catch {}
+                setSendingWa(false);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 font-semibold"
+            >
+              {sendingWa ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : (
+                <svg className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              )}
+              WhatsApp
+            </Button>
+          </div>
         </div>
       );
     }
@@ -1346,8 +1576,12 @@ export default function FleetPage() {
       };
       const totalPkg = entriesForPrint.reduce((s: number, e: any) => s + (parseInt(e.pkg) || 0), 0);
       const totalWt = entriesForPrint.reduce((s: number, e: any) => s + (parseFloat(e.wt) || 0), 0);
-      const grandTotal = entriesForPrint.reduce((s: number, e: any) => s + (parseFloat(e.total) || 0), 0);
+      const rowsTotal = entriesForPrint.reduce((s: number, e: any) => s + (parseFloat(e.total) || 0), 0);
       const c = previewData.charges || previewData;
+      const chargeFields = ['commission','labour','gr','crossing','truckFreight','advance','tfCredit','totalToPay','otherCharge','lcdc','crossing2','balanceFreight'];
+      const totalDeductions = chargeFields.reduce((sum, f) => sum + (parseFloat((c as any)[f]) || 0), 0);
+      const doorDelivery = parseFloat(c.doorDelivery) || 0;
+      const grandTotal = rowsTotal - totalDeductions + doorDelivery;
       const tableRows = entriesForPrint.map((e: any, idx: number) => `
         <tr>
           <td style="text-align:center;">${idx + 1}</td>
@@ -1367,7 +1601,7 @@ export default function FleetPage() {
 <head>
 <style>
     body { font-family: Arial, sans-serif; margin:0; padding:20px; background:#f3f4f6; }
-    .challan { border: 2px solid #000; width: 190mm; min-height: 120mm; padding: 5mm; margin: 10mm auto; position: relative; background:white; font-size: 12px; box-sizing:border-box; }
+    .challan { border: 2px solid #000; width: 190mm; padding: 5mm; margin: 10mm auto; position: relative; background:white; font-size: 12px; box-sizing:border-box; }
     .header-top { display: flex; justify-content: space-between; align-items: start; width: 100%; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
     .jurisdiction { text-align: center; font-size: 11px; font-weight: bold; color: #000080; margin-bottom: 5px; }
     .title { text-align: center; font-size: 22px; font-weight: bold; color: #000080; }
@@ -1385,6 +1619,11 @@ export default function FleetPage() {
     .totals-item .num { font-size: 22px; font-weight: bold; color: #8b0000; }
     .footer-row { display: flex; justify-content: space-between; align-items: end; margin-top: 20px; font-size: 12px; }
     .signature-line { border-top: 1px solid black; padding-top: 4px; text-align: center; }
+    @page { size: A4 portrait; margin: 8mm; }
+    @media print {
+      body { margin: 0; padding: 0; background: #fff; }
+      .challan { margin: 0 auto; border: 2px solid #000; }
+    }
 </style>
 </head>
 <body>
@@ -1562,23 +1801,21 @@ export default function FleetPage() {
         const dc = parseFloat(r.deliveryCommission) || 0;
         const c = parseFloat(r.crossing) || 0;
         const l = parseFloat(r.labor) || 0;
-        const cr = parseFloat(r.credit) || 0;
-        const db = parseFloat(r.debit) || 0;
-        return fd + cf + dc - c - l + cr - db;
+        return fd + cf + dc - c - l;
       };
       const filledRows = summaryPrintEntries.filter((r: any) =>
         r.truckNo || r.driverName || r.from || r.to ||
         r.transportName || r.challanNo || r.totalCount ||
         r.fareDelivery || r.crossing || r.crossingFare ||
-        r.labor || r.deliveryCommission || r.credit || r.debit || r.note
+        r.labor || r.deliveryCommission || r.credit || r.debit || r.note || r.note2
       );
       const slipsHtml = filledRows.map((r: any, idx: number) => {
         const total = getSlipTotal(r);
         return `
       <div class="slip-paper">
         <div class="slip-contacts">
-          <span class="mob-left">Mob. 96809-92567</span>
-          <span class="mob-right">Mob.: 86196-06627</span>
+          <span>Mob. 96809-92567</span><br/>
+          <span class="mob-right">Mob. 86196-06627</span>
         </div>
         <div class="slip-tagline">All disputes subject to Bhilwara jurisdiction</div>
         <div class="slip-headers">
@@ -1712,6 +1949,15 @@ export default function FleetPage() {
     </div>
   </div>
 </div>
+<!-- NOTE 2 -->
+<div style="padding:4px 0;width:100%;">
+  <div style="display:flex;align-items:center;width:100%;gap:10px;font-size:14.5px;font-weight:700;">
+    <span style="white-space:nowrap;">Note</span>
+    <div style="flex:1;border-bottom:1px dotted #000;position:relative;height:24px;">
+      <span style="position:absolute;left:10px;top:-2px;padding:0 4px;">${r.note2 || '—'}</span>
+    </div>
+  </div>
+</div>
 <!-- GRAND TOTAL -->
 <div style="padding:8px 0;width:100%;border-top:1.5px solid var(--slip-ink-print);margin-top:10px;">
   <div style="display:flex;align-items:center;width:100%;justify-content:space-between;font-size:16px;font-weight:900;">
@@ -1747,7 +1993,7 @@ export default function FleetPage() {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Poppins', sans-serif; background: #f3f4f6; padding: 20px; }
     .slip-paper {
-      width: 600px; height: 850px;
+      width: 600px; height: auto; min-height: 820px;
       background: var(--slip-paper-bg);
       background-image: var(--slip-paper-gradient);
       color: var(--slip-ink-print);
@@ -1760,7 +2006,7 @@ export default function FleetPage() {
       margin: 0 auto 60px;
       page-break-after: always;
     }
-    .slip-contacts { display: flex; justify-content: space-between; font-size: 13px; font-weight: 500; margin-bottom: 4px; letter-spacing: 0.5px; }
+    .slip-contacts { font-size: 13px; font-weight: 500; margin-bottom: 4px; letter-spacing: 0.5px; text-align: right; }
     .slip-tagline { text-align: center; font-size: 11px; font-family: 'Hind', sans-serif; font-weight: 500; margin-bottom: 6px; }
     .slip-headers { text-align: center; display: flex; flex-direction: column; gap: 4px; }
     .company-title-en { font-family: 'Poppins', sans-serif; font-size: 18.5px; font-weight: 800; letter-spacing: 0.3px; }
@@ -1788,6 +2034,7 @@ export default function FleetPage() {
     @media print {
       body { background: #fff; padding: 0; }
       .slip-paper { box-shadow: none; border: none; margin: 0 auto; page-break-after: always; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .slip-paper:last-child { page-break-after: auto; }
       .stamped-num { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .written-text { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
@@ -1905,8 +2152,7 @@ export default function FleetPage() {
         <title>Print Slip</title>
         <style>
           @media print {
-            body { margin:0; padding: 20px; }
-            @page { size: auto; margin: 10mm; }
+            body { margin: 0; padding: 0; }
           }
         </style>
       </head>

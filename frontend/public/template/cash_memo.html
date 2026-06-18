@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cash Memo</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family: Arial, sans-serif;
+
+    padding:20px;}
+
+.cash-memo{
+    width:600px;
+    min-height:600px;
+    margin:auto ;
+    background:white;
+    border:2px solid #333;
+    padding:17px;
+}
+
+.top-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+}
+
+.drno{
+    font-size:13px;
+    font-weight:bold;
+}
+
+.memo-no{
+    color:red;
+    font-size:15px;
+    font-weight:bold;
+    padding-right:65%;
+
+}
+
+.contact{
+    text-align:right;
+    padding-right:15%;
+    font-size:12px;
+    line-height:18px;
+    white-space:nowrap;
+}
+
+.company{
+    text-align:center;
+    margin-top:10px;
+}
+
+.company h1{
+    margin:0;
+    font-size:22px;
+    line-height:28px;
+    color:#0d2f78;
+}
+
+.company p{
+    margin-top:5px;
+    font-size:12px;
+}
+
+.form-row{
+    display:flex;
+    align-items:center;
+    margin-top:18px;
+}
+
+.label{
+    width:75px;
+    font-size:13px;
+    font-weight:bold;
+}
+
+.line{
+    flex:1;
+    border-bottom:1px solid #000;
+    FONT-size:13px;
+    height:20px;
+}
+
+.right-label{
+    margin-left:20px;
+    /* margin-right:30px; */
+    font-size:13px;
+    font-weight:bold;
+}
+
+.date{
+    width:100px;
+    border-bottom:1px solid #000;
+    font-size:13px;
+    height:20px;
+    text-align:center;
+}
+
+.bottom-section{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-top:25px;
+}
+
+.charges{
+    width:58%;
+}
+
+.charge-row{
+    display:flex;
+    justify-content:space-between;
+    margin-top:20px;
+    font-size:15px;
+}
+
+.total{
+    margin-top:27px;
+    font-weight:bold;
+}
+
+.amount-table{
+    width:130px;
+    border-collapse:collapse;
+}
+
+.amount-table th,
+.amount-table td{
+    border:1px solid #000;
+    width:65px;
+    height:38px;
+    text-align:center;
+    font-size:14px;
+}
+
+.amount-table th{
+    font-weight:bold;
+}
+
+.clerk{
+    text-align:right;
+    margin-top:60px;
+    font-weight:bold;
+    font-size:14px;
+}
+</style>
+</head>
+<body>
+
+<div class="cash-memo">
+
+    <div class="top-row">
+        <div class="drno">D.R.No : {{DR_NO}} </div>
+
+        <div class="contact">
+            ☎ 96809-92567<br>
+            ☎ 86196-06627
+        </div>
+    </div>
+
+    <div class="company">
+        <h1>Sant Kanwar Ram Transport Corp. (BHL.)</h2>
+        <p>123-124, Transport Nagar,<br>BHILWARA - 311001 (Raj.)</p>
+    </div>
+
+    <div class="form-row">
+        <div class="label">G.R. No.</div>
+        <div class="line">{{GR_NO}}</div>
+
+        <div class="right-label">Received on</div>
+        <div class="date">{{RECEIVED_ON}}</div>
+    </div>
+
+    <div class="form-row">
+        <div class="label">From</div>
+        <div class="line">{{FROM}}</div>
+
+        <div class="right-label" >Dt.</div>
+        <div class="date">{{DATE}}</div>
+    </div>
+
+    <div class="form-row">
+        <div class="label">Consignee</div>
+        <div class="line">{{CONSIGNEE}}</div>
+    </div>
+
+    <div class="form-row">
+        <div class="label">Through</div>
+        <div class="line">{{THROUGH}}</div>
+    </div>
+
+    <div class="bottom-section">
+
+        <div class="charges">
+
+            <div class="charge-row" style="padding-top:23px;">
+                <span>Freight</span>
+                <span>..........</span>
+            </div>
+
+            <div class="charge-row">
+                <span>Labour</span>
+                <span>..........</span>
+            </div>
+
+            <div class="charge-row">
+                <span>Stationery</span>
+                <span>..........</span>
+            </div>
+
+            <div class="charge-row">
+                <span>Commission</span>
+                <span>..........</span>
+            </div>
+
+            <div class="charge-row">
+                <span>A.O.C.</span>
+                <span>..........</span>
+            </div>
+
+            <div class="total">
+                Total
+            </div>
+
+        </div>
+
+        <table class="amount-table">
+            <tr>
+                <th>Rs.</th>
+                <th>P.</th>
+            </tr>
+            <tr>
+                <td>{{FREIGHT}}</td>
+                <td>{{FREIGHT_P}}</td>
+            </tr>
+            <tr>
+                <td>{{LABOUR}}</td>
+                <td>{{LABOUR_P}}</td>
+            </tr>
+            <tr>
+                <td>{{STATIONERY}}</td>
+                <td>{{STATIONERY_P}}</td>
+            </tr>
+            <tr>
+                <td>{{COMMISSION}}</td>
+                <td>{{COMMISSION_P}}</td>
+            </tr>
+            <tr>
+                <td>{{AOC}}</td>
+                <td>{{AOC_P}}</td>
+            </tr>
+            <tr>
+                <td>{{TOTAL}}</td>
+                <td>{{TOTAL_P}}</td>
+            </tr>
+        </table>
+
+    </div>
+
+    <div class="clerk">
+        D. Clerk
+    </div>
+
+</div>
+
+</body>
+</html>

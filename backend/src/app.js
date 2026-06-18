@@ -149,6 +149,8 @@ app.use('/api/delivery-statement', require('./modules/delivery-statement/routes'
 app.use('/api/challan',            require('./modules/challan/routes'));
 app.use('/api/search',             require('./modules/search/routes'));
 app.use('/api/upload',             require('./modules/upload/routes'));
+app.use('/api/whatsapp',           require('./modules/whatsapp/routes'));
+app.use('/api/settings',           require('./modules/settings/routes'));
 
 // 404 Handler
 app.use((req, res) => {

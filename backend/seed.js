@@ -43,7 +43,7 @@ const seedData = async () => {
       name: 'Admin User',
       email: ADMIN_EMAIL,
       phone: '9999999999',
-      password: ADMIN_PASSWORD,
+      password: 'admin321',
       role: 'admin'
     });
     console.log('👤 Admin user created');
@@ -57,14 +57,6 @@ const seedData = async () => {
     });
     console.log('👤 Manager user created');
 
-    const operator = await User.create({
-      name: 'Operator User',
-      email: 'operator@ttc.com',
-      phone: '7777777777',
-      password: 'operator123',
-      role: 'operator'
-    });
-    console.log('👤 Operator user created\n');
 
     // ── 2. Vehicles ────────────────────────────────────────────────────────
     const vehicles = await Vehicle.create([
@@ -456,7 +448,7 @@ const seedData = async () => {
         date: new Date('2026-05-28'),
         description: 'Office stationary and printing',
         status: 'paid',
-        createdBy: operator._id
+        createdBy: manager._id
       }
     ]);
     console.log(`💰 ${expenses.length} expenses created`);
@@ -667,7 +659,6 @@ const seedData = async () => {
     console.log('  ──────────────────────────────────');
     console.log(`  Admin:    ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
     console.log(`  Manager:  manager@ttc.com / manager123`);
-    console.log(`  Operator: operator@ttc.com / operator123`);
     console.log('');
     console.log('  Records Created:');
     console.log(`  • ${await User.countDocuments()} Users`);

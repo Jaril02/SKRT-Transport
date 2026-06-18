@@ -29,11 +29,18 @@ export function AddExpenseDialog({ onExpenseAdded }: { onExpenseAdded: () => voi
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     category: "Fuel",
-    amount: 0,
+    amount: "",
     vehicle: "",
     description: "",
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    status: "paid"
   });
+
+  const [customCategory, setCustomCategory] = useState("");
+
+  useEffect(() => {
+    setCustomCategory("");
+  }, [formData.category]);
 
   useEffect(() => {
     const fetchVehicles = async () => {
@@ -54,11 +61,21 @@ export function AddExpenseDialog({ onExpenseAdded }: { onExpenseAdded: () => voi
     setLoading(true);
 
     try {
-      await api.post("/expenses", formData);
+      const description = formData.category === "Other" && customCategory.trim()
+        ? `[${customCategory.trim()}] ${formData.description}`
+        : formData.description;
+      const payload: Record<string, any> = {
+        ...formData,
+        description,
+        amount: Number(formData.amount) || 0
+      };
+      if (!formData.vehicle || formData.vehicle === "none") delete payload.vehicle;
+      await api.post("/expenses", payload);
       toast.success("Expense recorded successfully!");
       setOpen(false);
       onExpenseAdded();
-      setFormData({ category: "Fuel", amount: 0, vehicle: "", description: "", date: new Date().toISOString().split('T')[0] });
+      setFormData({ category: "Fuel", amount: "", vehicle: "", description: "", date: new Date().toISOString().split('T')[0], status: "paid" });
+      setCustomCategory("");
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to add expense");
     } finally {
@@ -95,16 +112,31 @@ export function AddExpenseDialog({ onExpenseAdded }: { onExpenseAdded: () => voi
                 <SelectItem value="Other">Other</SelectItem>
               </SelectContent>
             </Select>
+            {formData.category === "Other" && (
+              <div className="mt-2">
+                <Input
+                  placeholder="Type custom category name..."
+                  value={customCategory}
+                  onChange={(e) => setCustomCategory(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            )}
           </div>
           
           <div className="space-y-2">
             <Label htmlFor="amount">Amount (₹)</Label>
             <Input 
               id="amount" 
-              type="number"
+              type="text"
+              inputMode="numeric"
               required
+              placeholder="0"
               value={formData.amount} 
-              onChange={(e) => setFormData({...formData, amount: Number(e.target.value)})} 
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "" || /^\d+$/.test(val)) setFormData({...formData, amount: val});
+              }} 
             />
           </div>
 
@@ -145,6 +177,22 @@ export function AddExpenseDialog({ onExpenseAdded }: { onExpenseAdded: () => voi
               value={formData.description} 
               onChange={(e) => setFormData({...formData, description: e.target.value})} 
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Select 
+              value={formData.status} 
+              onValueChange={(v) => setFormData({...formData, status: v})}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <DialogFooter>

@@ -80,15 +80,7 @@
 
 <body>
 
-  <!-- PRINT BUTTON -->
-  <div class="no-print mb-4">
-    <button
-      onclick="window.print()"
-      class="bg-black text-white px-5 py-2 rounded-lg"
-    >
-      Print Register
-    </button>
-  </div>
+ 
 
   <!-- PAGE -->
   <div class="page">

@@ -8,18 +8,19 @@ const {
   updateStatus, 
   deleteVehicle 
 } = require('./controller');
-const { protect, authorize } = require('../../middleware/authMiddleware');
+const { protect } = require('../../middleware/authMiddleware');
+const { requirePermission } = require('../../middleware/permissionMiddleware');
 
 router.route('/')
   .get(protect, getVehicles)
-  .post(protect, authorize('admin', 'manager'), createVehicle);
+  .post(protect, requirePermission('vehicles', 'create'), createVehicle);
 
 router.route('/:id')
   .get(protect, getVehicleById)
-  .patch(protect, authorize('admin', 'manager', 'operator'), updateVehicle)
-  .delete(protect, authorize('admin'), deleteVehicle);
+  .patch(protect, requirePermission('vehicles', 'edit'), updateVehicle)
+  .delete(protect, requirePermission('vehicles', 'delete'), deleteVehicle);
 
 router.route('/:id/status')
-  .patch(protect, authorize('admin', 'manager', 'operator'), updateStatus);
+  .patch(protect, requirePermission('vehicles', 'edit'), updateStatus);
 
 module.exports = router;

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -13,7 +13,9 @@ import {
   Settings,
   LogOut,
   Package,
-  Warehouse
+  Warehouse,
+  Menu,
+  X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -33,16 +35,27 @@ const menuItems = [
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
-export function Sidebar() {
+export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const pathname = usePathname();
   const { logout } = useAuth();
 
   return (
-    <aside className="w-64 h-screen bg-background border-r border-border flex flex-col fixed left-0 top-0 z-50">
-      <div className="p-6">
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-          SKRT
-        </h1>
+    <aside
+      className={cn(
+        "w-64 h-screen bg-background border-r border-border flex flex-col fixed left-0 top-0 z-50 transition-transform duration-300",
+        isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      )}
+    >
+      <div className="p-6 flex justify-between items-center">
+        <a href="/dashboard" className="flex items-center gap-3">
+          <img src="logobg.png" alt="logo" className="w-25 " />
+        </a>
+        <button
+          onClick={onClose}
+          className="md:hidden text-muted-foreground hover:text-foreground"
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       <nav className="flex-1 px-4 space-y-2 mt-4">
@@ -60,6 +73,7 @@ export function Sidebar() {
                   ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                   : "text-muted-foreground hover:bg-secondary hover:text-foreground"
               )}
+              onClick={() => onClose()}
             >
               <Icon className={cn(
                 "w-5 h-5",
@@ -73,7 +87,10 @@ export function Sidebar() {
 
       <div className="p-4 border-t border-border">
         <button
-          onClick={logout}
+          onClick={() => {
+            logout();
+            onClose();
+          }}
           className="flex items-center gap-3 px-4 py-3 w-full text-muted-foreground hover:text-destructive transition-colors"
         >
           <LogOut className="w-5 h-5" />

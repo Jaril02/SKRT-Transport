@@ -10,6 +10,7 @@ import { ViewEditEntryDialog } from "@/components/entry/ViewEditEntryDialog";
 
 import { toast } from "sonner";
 import api from "@/lib/api";
+import { fetchCashMemoTemplate, fillCashMemoTemplate } from "@/lib/cash-memo-template";
 
 const PER_PAGE = 30;
 
@@ -117,71 +118,39 @@ export default function InventoryPage() {
 
   useEffect(() => { setPage(1); }, [searchQuery]);
 
-  const handlePrintCashMemo = () => {
+  const handlePrintCashMemo = async () => {
+    const template = await fetchCashMemoTemplate();
+    const html = fillCashMemoTemplate(template, {
+      drNo: "DR-___",
+      grNo: "",
+      date: "",
+      receivedOn: "",
+      from: "",
+      consignee: "",
+      through: "",
+      freight: "",
+      freightP: "",
+      labour: "",
+      labourP: "",
+      stationery: "5",
+      stationeryP: "00",
+      commission: "",
+      commissionP: "",
+      aoc: "5",
+      aocP: "00",
+      total: "",
+      totalP: "00",
+    });
     const pw = window.open("", "_blank");
     if (!pw) return;
-    pw.document.write(`<!DOCTYPE html>
-<html>
-<head>
-<style>
-    body { font-family: Arial, sans-serif; }
-    .page { border: 2px solid #000; width: 1000px; padding: 20px; margin: 20px auto; position: relative; }
-    .header-top { display: flex; justify-content: space-between; align-items: center; }
-    .dr-no { font-size: 18px; font-weight: bold; color: #333; }
-    .contact { font-size: 14px; font-weight: bold; }
-    .title { text-align: center; font-size: 24px; font-weight: bold; color: #000080; margin-top: 10px; }
-    .subtitle { text-align: center; font-size: 16px; color: #000080; margin-bottom: 20px; }
-    .form-line { display: flex; margin-bottom: 15px; align-items: center; }
-    .label { font-weight: bold; width: 100px; }
-    .input-line { border-bottom: 1px solid black; flex-grow: 1; height: 1.2em; }
-    .table-container { border: 1px solid black; margin-top: 30px; width: 100%; }
-    .table-container table { width: 100%; border-collapse: collapse; }
-    .table-container th, .table-container td { text-align: left; padding: 8px; }
-    .table-container th { border-bottom: 1px solid black; font-size: 18px; text-align: center; }
-    .table-container tr { height: 30px; }
-    .signature { text-align: right; margin-top: 40px; font-weight: bold; }
-</style>
-</head>
-<body>
-<div class="page">
-    <div class="header-top">
-        <div class="dr-no">D.R. No. <span style="color:red;">DR-___</span></div>
-        <div class="header-title"><span style="font-weight:bold;font-size:18px;">CASH MEMO</span></div>
-        <div style="font-size:11px; font-weight:bold; text-align: right; color:#000000; line-height: 1.4; padding-right: 10px; white-space: nowrap;">
-            <span>Mob.: 96809-92567</span><br/>
-            <span>Mob.: 86196-06627</span>
-        </div>
-    </div>
-    <div class="title">Sant Kanwar Ram Transport Corp. (BHL.)</div>
-    <div class="subtitle">123-124, Transport Nagar, BHILWARA - 311001 (Raj.)</div>
-    <div class="form-line"><div class="label">G.R. No.</div><div class="input-line"></div><div style="width:110px;text-align:right;font-weight:bold;white-space:nowrap;padding-right:6px;">Received on</div><div class="input-line" style="width:200px;flex-shrink:0;"></div></div>
-    <div class="form-line"><div class="label">From</div><div class="input-line"></div><div style="width:110px;text-align:right;font-weight:bold;white-space:nowrap;padding-right:6px;">Dt.</div><div class="input-line" style="width:200px;flex-shrink:0;"></div></div>
-    <div class="form-line"><div class="label">Consignee</div><div class="input-line"></div></div>
-    <div class="form-line"><div class="label">Through</div><div class="input-line"></div></div>
-    <div class="table-container">
-        <table>
-            <thead><tr><th style="width:70%;"></th><th style="width:15%;">Rs.</th><th style="width:15%;">P.</th></tr></thead>
-            <tbody>
-                <tr><td>Freight</td><td style="border-left:1px solid black;"></td><td style="border-left:1px solid black;"></td></tr>
-                <tr><td>Labour</td><td style="border-left:1px solid black;"></td><td style="border-left:1px solid black;"></td></tr>
-                <tr><td>Stationery</td><td style="border-left:1px solid black;">5</td><td style="border-left:1px solid black;">00</td></tr>
-                <tr><td>Commission</td><td style="border-left:1px solid black;"></td><td style="border-left:1px solid black;"></td></tr>
-                <tr><td>A.O.C.</td><td style="border-left:1px solid black;">5</td><td style="border-left:1px solid black;"></td></tr>
-                <tr style="border-top:1px solid black;"><td style="font-weight:bold;">Total</td><td style="border-left:1px solid black;"></td><td style="border-left:1px solid black;"></td></tr>
-            </tbody>
-        </table>
-    </div>
-    <div class="signature">D. Clerk</div>
-</div>
-</body>
-</html>`);
+    pw.document.write(html);
     pw.document.close();
   };
 
   const exportCSV = () => {
     const headers = ["S.No.", "From", "To", "G. R. No.", "Consignor", "Consignee", "No. of Packages", "Contents", "Freight", "Delivery Receipt No.", "Date of Delivery", "Delivery Status"];
     const rows = filtered.map((entry: any, idx: number) => [
-      filtered.length - idx,
+      entry.sno || "",
       entry.from || "",
       entry.to || "",
       entry.grNo || "",
@@ -220,7 +189,7 @@ export default function InventoryPage() {
           animation: row-blink 1.2s ease-in-out 2 !important;
         }
       `}</style>
-      <div className="space-y-6 px-8 py-8 h-full max-w-full">
+      <div className="space-y-6 px-4 md:px-8 py-4 md:py-8 h-full max-w-full">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Inventory</h2>
@@ -330,7 +299,7 @@ export default function InventoryPage() {
                         className={`cursor-pointer hover:bg-slate-800/40 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-900/40'}`}
                       >
                         <td className="border border-slate-700 text-center font-mono text-slate-400 bg-slate-900/50 p-1.5">
-                          {filtered.length - ((currentPage - 1) * PER_PAGE + idx)}
+                          {entry.sno}
                         </td>
                         <td className="border border-slate-700 p-1.5 text-white">{entry.from}</td>
                         <td className="border border-slate-700 p-1.5 text-white">{entry.to}</td>

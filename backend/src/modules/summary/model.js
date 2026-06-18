@@ -17,7 +17,8 @@ const summaryRowSchema = new mongoose.Schema({
   credit: { type: Number, default: 0 },
   debit: { type: Number, default: 0 },
   grandTotal: { type: Number, default: 0 },
-  note: { type: String, default: "" }
+  note: { type: String, default: "" },
+  note2: { type: String, default: "" }
 });
 
 const summaryRegisterSchema = new mongoose.Schema({

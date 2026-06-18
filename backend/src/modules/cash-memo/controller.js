@@ -29,6 +29,23 @@ const syncDeliveryStatementForDate = async (dateStr) => {
       return;
     }
 
+    const existingEntries = dsRegister ? dsRegister.entries || [] : [];
+    const existingSnoMap = new Map();
+    for (const e of existingEntries) {
+      if (e.drNo && e.sno) {
+        existingSnoMap.set(e.drNo, e.sno);
+      }
+    }
+
+    let maxSno = 0;
+    const allDs = await DSRegister.find();
+    for (const r of allDs) {
+      for (const entry of (r.entries || [])) {
+        const num = parseInt(entry.sno, 10);
+        if (!isNaN(num) && num > maxSno) maxSno = num;
+      }
+    }
+
     const entries = cashMemos.map((cm, idx) => {
       const freightVal = (cm.freight || 0) + (cm.freightPaise || 0) / 100;
       const labourVal = (cm.labour || 0) + (cm.labourPaise || 0) / 100;
@@ -36,8 +53,17 @@ const syncDeliveryStatementForDate = async (dateStr) => {
       const commissionVal = (cm.commission || 0) + (cm.commissionPaise || 0) / 100;
       const aocVal = (cm.aoc || 0) + (cm.aocPaise || 0) / 100;
 
+      const existingSno = existingSnoMap.get(cm.drNo);
+      let sno;
+      if (existingSno) {
+        sno = existingSno;
+      } else {
+        maxSno++;
+        sno = String(maxSno);
+      }
+
       return {
-        sno: String(idx + 1),
+        sno,
         drNo: cm.drNo,
         receiptNo: "",
         freight: String(freightVal.toFixed(2)),

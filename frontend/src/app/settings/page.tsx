@@ -1,406 +1,514 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, Bell, Shield, Building, Users, Plus, Pencil, Trash2, RefreshCw, Loader2, Check, X } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
-import api from "@/lib/api";
+import { User, Shield, Building, Sparkles, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
+import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { cn } from "@/lib/utils";
 
-// ─── User Management Tab ────────────────────────────────────────────────────
-function UserManagementTab() {
-  const [users, setUsers]           = React.useState<any[]>([]);
-  const [loading, setLoading]       = React.useState(true);
-  const [showForm, setShowForm]     = React.useState(false);
-  const [editUser, setEditUser]     = React.useState<any>(null);
-  const [resetUser, setResetUser]   = React.useState<any>(null);
-  const [newPass, setNewPass]       = React.useState("");
-  const [submitting, setSubmitting] = React.useState(false);
-  const [form, setForm]             = React.useState({ name: "", email: "", password: "", role: "operator", phone: "" });
+const roleColors: Record<string, string> = {
+  admin: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+  manager: "bg-[#2388ff]/10 text-[#2388ff] border-[#2388ff]/20",
+};
 
-  const loadUsers = async () => {
+const MODULES = [
+  'shipments', 'inventory', 'vehicles', 'drivers',
+  'clients', 'invoices', 'contacts', 'expenses',
+  'users', 'settings',
+] as const;
+
+type Module = typeof MODULES[number];
+type Permissions = Record<Module, { create: boolean; edit: boolean; delete: boolean }>;
+
+const defaultPermissions = (all: boolean): Permissions =>
+  Object.fromEntries(MODULES.map(m => [m, { create: all, edit: all, delete: all }])) as Permissions;
+
+export default function SettingsPage() {
+  const { user: authUser, isLoading: authLoading } = useAuth();
+
+  // ── Profile state ──
+  const [profile, setProfile] = useState({ name: "", email: "", phone: "" });
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // ── Company state ──
+  const [company, setCompany] = useState({ companyName: "", gstin: "", address: "", phone: "", email: "" });
+  const [companyLoading, setCompanyLoading] = useState(true);
+  const [savingCompany, setSavingCompany] = useState(false);
+
+  // ── Security state ──
+  const [passwords, setPasswords] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  // ── Permissions state ──
+  const [users, setUsers] = useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [updatingRole, setUpdatingRole] = useState<string | null>(null);
+  const [perms, setPerms] = useState<Permissions | null>(null);
+  const [permsLoading, setPermsLoading] = useState(false);
+  const [savingPerms, setSavingPerms] = useState(false);
+
+  // ── Fetch profile ──
+  useEffect(() => {
+    if (authLoading || !authUser) return;
+    const fetchProfile = async () => {
+      try {
+        setProfileLoading(true);
+        const { data } = await api.get("/auth/profile");
+        const u = data.data || data;
+        setProfile({ name: u.name || "", email: u.email || "", phone: u.phone || "" });
+      } catch {
+        toast.error("Failed to load profile");
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+    fetchProfile();
+  }, [authUser, authLoading]);
+
+  // ── Fetch company settings ──
+  useEffect(() => {
+    const fetchCompany = async () => {
+      try {
+        setCompanyLoading(true);
+        const { data } = await api.get("/settings/company");
+        const s = data.data || data;
+        setCompany({
+          companyName: s.companyName || "",
+          gstin: s.gstin || "",
+          address: s.address || "",
+          phone: s.phone || "",
+          email: s.email || "",
+        });
+      } catch {
+        toast.error("Failed to load company settings");
+      } finally {
+        setCompanyLoading(false);
+      }
+    };
+    fetchCompany();
+  }, []);
+
+  // ── Fetch users ──
+  const fetchUsers = useCallback(async () => {
     try {
-      setLoading(true);
-      const res = await api.get("/auth/users");
-      if (res.data.success) setUsers(res.data.data);
-    } catch { toast.error("Failed to load users"); }
-    finally { setLoading(false); }
-  };
+      setUsersLoading(true);
+      const { data } = await api.get("/auth/users");
+      if (data.success) setUsers(data.data || []);
+    } catch {
+      console.error("Failed to fetch users");
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
 
-  React.useEffect(() => { loadUsers(); }, []);
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const fetchPermissions = useCallback(async () => {
+    try {
+      setPermsLoading(true);
+      const { data } = await api.get("/settings/permissions");
+      if (data.success && data.data?.permissions) {
+        setPerms(data.data.permissions);
+      }
+    } catch {
+      toast.error("Failed to load permissions");
+    } finally {
+      setPermsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authUser?.role === 'admin') fetchPermissions();
+  }, [authUser?.role, fetchPermissions]);
+
+  // ── Handlers ──
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
+    if (!profile.name.trim() || !profile.email.trim()) {
+      toast.error("Name and email are required");
+      return;
+    }
     try {
-      const res = await api.post("/auth/register", form);
-      if (res.data.success) {
-        toast.success("User created successfully");
-        setShowForm(false);
-        setForm({ name: "", email: "", password: "", role: "operator", phone: "" });
-        loadUsers();
+      setSavingProfile(true);
+      const { data } = await api.put("/auth/profile", profile);
+      toast.success("Profile updated successfully");
+      if (data.data) {
+        setProfile({ name: data.data.name, email: data.data.email, phone: data.data.phone || "" });
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to create user");
-    } finally { setSubmitting(false); }
-  };
-
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const res = await api.put(`/auth/users/${editUser._id}`, {
-        name: form.name, email: form.email, role: form.role, phone: form.phone
-      });
-      if (res.data.success) {
-        toast.success("User updated");
-        setEditUser(null);
-        loadUsers();
-      }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to update user");
-    } finally { setSubmitting(false); }
-  };
-
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
-    try {
-      const res = await api.delete(`/auth/users/${id}`);
-      if (res.data.success) { toast.success("User deleted"); loadUsers(); }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to delete user");
+      toast.error(err.response?.data?.message || "Failed to update profile");
+    } finally {
+      setSavingProfile(false);
     }
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPass || newPass.length < 6) { toast.error("Password must be at least 6 characters"); return; }
-    setSubmitting(true);
     try {
-      const res = await api.post(`/auth/users/${resetUser._id}/reset-password`, { newPassword: newPass });
-      if (res.data.success) {
-        toast.success(`Password reset for ${resetUser.name}`);
-        setResetUser(null);
-        setNewPass("");
-      }
+      setSavingCompany(true);
+      await api.put("/settings/company", company);
+      toast.success("Company details updated successfully");
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to reset password");
-    } finally { setSubmitting(false); }
+      toast.error(err.response?.data?.message || "Failed to update company details");
+    } finally {
+      setSavingCompany(false);
+    }
   };
 
-  const openEdit = (user: any) => {
-    setEditUser(user);
-    setForm({ name: user.name, email: user.email, password: "", role: user.role, phone: user.phone || "" });
-    setShowForm(false);
-  };
-
-  const roleBadge = (role: string) => {
-    const colors: Record<string, string> = {
-      admin:    "bg-red-500/10 text-red-400 border-red-500/20",
-      manager:  "bg-blue-500/10 text-blue-400 border-blue-500/20",
-      operator: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-      driver:   "bg-amber-500/10 text-amber-400 border-amber-500/20",
-      client:   "bg-purple-500/10 text-purple-400 border-purple-500/20"
-    };
-    return `text-xs px-2 py-0.5 rounded-full border ${colors[role] ?? "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"}`;
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-semibold">System Users</h3>
-          <p className="text-sm text-muted-foreground">{users.length} users registered</p>
-        </div>
-        <Button size="sm" onClick={() => { setShowForm(true); setEditUser(null); setForm({ name: "", email: "", password: "", role: "operator", phone: "" }); }}>
-          <Plus className="w-4 h-4 mr-2" /> Add User
-        </Button>
-      </div>
-
-      {/* Create Form */}
-      {showForm && (
-        <Card className="border-primary/20">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">New User</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
-              <div><Label>Full Name</Label><Input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} required /></div>
-              <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))} required /></div>
-              <div><Label>Password</Label><Input type="password" value={form.password} onChange={e => setForm(f => ({...f, password: e.target.value}))} required minLength={6} /></div>
-              <div><Label>Phone</Label><Input value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))} /></div>
-              <div>
-                <Label>Role</Label>
-                <select value={form.role} onChange={e => setForm(f => ({...f, role: e.target.value}))}
-                  className="w-full h-10 px-3 rounded-md border border-border bg-background text-sm">
-                  <option value="operator">Operator</option>
-                  <option value="manager">Manager</option>
-                  <option value="driver">Driver</option>
-                  <option value="client">Client</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              <div className="flex items-end gap-2">
-                <Button type="submit" disabled={submitting} size="sm">
-                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                  {submitting ? "Creating..." : "Create"}
-                </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setShowForm(false)}>
-                  <X className="w-4 h-4" /> Cancel
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Edit Form */}
-      {editUser && (
-        <Card className="border-amber-500/20">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Edit User — {editUser.name}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleUpdate} className="grid grid-cols-2 gap-3">
-              <div><Label>Full Name</Label><Input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} required /></div>
-              <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))} required /></div>
-              <div><Label>Phone</Label><Input value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))} /></div>
-              <div>
-                <Label>Role</Label>
-                <select value={form.role} onChange={e => setForm(f => ({...f, role: e.target.value}))}
-                  className="w-full h-10 px-3 rounded-md border border-border bg-background text-sm">
-                  <option value="operator">Operator</option>
-                  <option value="manager">Manager</option>
-                  <option value="driver">Driver</option>
-                  <option value="client">Client</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              <div className="col-span-2 flex gap-2">
-                <Button type="submit" disabled={submitting} size="sm">
-                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                  Save Changes
-                </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setEditUser(null)}><X className="w-4 h-4" /> Cancel</Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Reset Password Form */}
-      {resetUser && (
-        <Card className="border-rose-500/20">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Reset Password — {resetUser.name}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleResetPassword} className="flex gap-3 items-end">
-              <div className="flex-1">
-                <Label>New Password</Label>
-                <Input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} minLength={6} required placeholder="Min 6 characters" />
-              </div>
-              <Button type="submit" disabled={submitting} size="sm">
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                Reset
-              </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setResetUser(null)}><X className="w-4 h-4" /></Button>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Users Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/50">
-                  <th className="text-left p-4 text-muted-foreground font-medium">Name</th>
-                  <th className="text-left p-4 text-muted-foreground font-medium">Email</th>
-                  <th className="text-left p-4 text-muted-foreground font-medium">Phone</th>
-                  <th className="text-left p-4 text-muted-foreground font-medium">Role</th>
-                  <th className="text-right p-4 text-muted-foreground font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></td></tr>
-                ) : users.length === 0 ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No users found</td></tr>
-                ) : users.map(u => (
-                  <tr key={u._id} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                    <td className="p-4 font-medium">{u.name}</td>
-                    <td className="p-4 text-muted-foreground">{u.email}</td>
-                    <td className="p-4 text-muted-foreground">{u.phone || "—"}</td>
-                    <td className="p-4"><span className={roleBadge(u.role)}>{u.role}</span></td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2 justify-end">
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(u)} title="Edit">
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-400 hover:text-amber-300" onClick={() => { setResetUser(u); setNewPass(""); setEditUser(null); setShowForm(false); }} title="Reset Password">
-                          <RefreshCw className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive/80" onClick={() => handleDelete(u._id, u.name)} title="Delete">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// ─── Profile Tab ──────────────────────────────────────────────────────────────
-function ProfileTab() {
-  const { user } = useAuth();
-  const [form, setForm]         = React.useState({ name: "", email: "", phone: "" });
-  const [saving, setSaving]     = React.useState(false);
-
-  React.useEffect(() => {
-    if (user) setForm({ name: user.name, email: user.email, phone: (user as any).phone || "" });
-  }, [user]);
-
-  const handleSave = async (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
-    try {
-      const res = await api.put("/auth/profile", form);
-      if (res.data.success) toast.success("Profile updated successfully");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to update profile");
-    } finally { setSaving(false); }
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Personal Information</CardTitle>
-        <CardDescription>Update your profile details.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSave} className="space-y-4 max-w-md">
-          <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
-            <Input id="name" value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} required />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
-            <Input id="email" type="email" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))} required />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
-            <Input id="phone" value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))} />
-          </div>
-          <Button type="submit" disabled={saving}>
-            {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-            {saving ? "Saving..." : "Save Changes"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ─── Security Tab ─────────────────────────────────────────────────────────────
-function SecurityTab() {
-  const [form, setForm]       = React.useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
-  const [submitting, setSub]  = React.useState(false);
-
-  const handleChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (form.newPassword !== form.confirmPassword) {
+    if (!passwords.currentPassword || !passwords.newPassword) {
+      toast.error("Please fill in both password fields");
+      return;
+    }
+    if (passwords.newPassword !== passwords.confirmPassword) {
       toast.error("New passwords do not match");
       return;
     }
-    if (form.newPassword.length < 6) {
+    if (passwords.newPassword.length < 6) {
       toast.error("New password must be at least 6 characters");
       return;
     }
-    setSub(true);
     try {
-      const res = await api.post("/auth/change-password", {
-        currentPassword: form.currentPassword,
-        newPassword:     form.newPassword
+      setSavingPassword(true);
+      await api.post("/auth/change-password", {
+        currentPassword: passwords.currentPassword,
+        newPassword: passwords.newPassword,
       });
-      if (res.data.success) {
-        toast.success("Password changed successfully");
-        setForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      }
+      toast.success("Password changed successfully");
+      setPasswords({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to change password");
-    } finally { setSub(false); }
+    } finally {
+      setSavingPassword(false);
+    }
   };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Security Settings</CardTitle>
-        <CardDescription>Change your account password.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleChange} className="space-y-4 max-w-md">
-          <div className="space-y-2">
-            <Label htmlFor="currentPass">Current Password</Label>
-            <Input id="currentPass" type="password" value={form.currentPassword} onChange={e => setForm(f => ({...f, currentPassword: e.target.value}))} required />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="newPass">New Password</Label>
-            <Input id="newPass" type="password" value={form.newPassword} onChange={e => setForm(f => ({...f, newPassword: e.target.value}))} required minLength={6} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirmPass">Confirm New Password</Label>
-            <Input id="confirmPass" type="password" value={form.confirmPassword} onChange={e => setForm(f => ({...f, confirmPassword: e.target.value}))} required />
-          </div>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-            {submitting ? "Updating..." : "Update Password"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
-  );
-}
+  const handleSavePermissions = async () => {
+    if (!perms) return;
+    try {
+      setSavingPerms(true);
+      await api.put("/settings/permissions", perms);
+      toast.success("Permissions saved");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to save permissions");
+    } finally {
+      setSavingPerms(false);
+    }
+  };
 
-// ─── Main Settings Page ───────────────────────────────────────────────────────
-export default function SettingsPage() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const setModulePerm = (mod: Module, action: 'create' | 'edit' | 'delete', val: boolean) => {
+    setPerms(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [mod]: { ...prev[mod], [action]: val },
+      };
+    });
+  };
+
+  const selectAll = () => {
+    setPerms(prev => {
+      if (!prev) return prev;
+      const next = { ...prev };
+      for (const m of MODULES) {
+        next[m] = { create: true, edit: true, delete: true };
+      }
+      return next;
+    });
+  };
+
+  const clearAll = () => {
+    setPerms(prev => {
+      if (!prev) return prev;
+      const next = { ...prev };
+      for (const m of MODULES) {
+        next[m] = { create: false, edit: false, delete: false };
+      }
+      return next;
+    });
+  };
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    try {
+      setUpdatingRole(userId);
+      await api.put(`/auth/users/${userId}`, { role: newRole });
+      setUsers((prev) => prev.map((u) => (u._id === userId ? { ...u, role: newRole } : u)));
+      toast.success("Role updated successfully");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to update role");
+    } finally {
+      setUpdatingRole(null);
+    }
+  };
+
+  const isLoading = profileLoading || companyLoading || authLoading;
+  const inputClass = "bg-zinc-900/60 border-zinc-800 text-zinc-100 focus:ring-1 focus:ring-primary focus:border-primary";
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
-          <p className="text-muted-foreground">Manage your account and platform preferences.</p>
+          <h2 className="text-3xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
+            Settings <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            Manage your account, organization details, security, and user permissions.
+          </p>
         </div>
 
-        <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="bg-secondary/10 p-1">
-            <TabsTrigger value="profile"  className="gap-2"><User className="w-4 h-4" /> Profile</TabsTrigger>
-            <TabsTrigger value="security" className="gap-2"><Shield className="w-4 h-4" /> Security</TabsTrigger>
-            {isAdmin && (
-              <TabsTrigger value="users"  className="gap-2"><Users className="w-4 h-4" /> User Management</TabsTrigger>
-            )}
-          </TabsList>
+        <Card className="bg-zinc-950/40 border-zinc-800 backdrop-blur-md shadow-xl overflow-hidden">
+          <CardContent className="p-6">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-16 text-zinc-400 gap-2">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <p className="text-xs uppercase tracking-wider font-semibold">Loading settings...</p>
+              </div>
+            ) : (
+              <Tabs defaultValue="profile" className="flex flex-col space-y-6 w-full">
+                <TabsList className="w-full justify-start border-b border-zinc-800 bg-transparent p-0 gap-6 rounded-none h-auto pb-3 flex">
+                  <TabsTrigger value="profile" className="gap-2 bg-transparent text-zinc-400 hover:text-zinc-100 data-[state=active]:bg-transparent data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-1 pb-3 pt-0 text-sm font-semibold transition-all">
+                    <User className="w-4 h-4" /> Profile Details
+                  </TabsTrigger>
+                  <TabsTrigger value="company" className="gap-2 bg-transparent text-zinc-400 hover:text-zinc-100 data-[state=active]:bg-transparent data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-1 pb-3 pt-0 text-sm font-semibold transition-all">
+                    <Building className="w-4 h-4" /> Company Details
+                  </TabsTrigger>
+                  <TabsTrigger value="security" className="gap-2 bg-transparent text-zinc-400 hover:text-zinc-100 data-[state=active]:bg-transparent data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-1 pb-3 pt-0 text-sm font-semibold transition-all">
+                    <Shield className="w-4 h-4" /> Security
+                  </TabsTrigger>
+                  {authUser?.role === 'admin' && (
+                    <TabsTrigger value="permissions" className="gap-2 bg-transparent text-zinc-400 hover:text-zinc-100 data-[state=active]:bg-transparent data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-1 pb-3 pt-0 text-sm font-semibold transition-all">
+                      <Users className="w-4 h-4" /> Permissions
+                    </TabsTrigger>
+                  )}
+                </TabsList>
 
-          <TabsContent value="profile"><ProfileTab /></TabsContent>
-          <TabsContent value="security"><SecurityTab /></TabsContent>
-          {isAdmin && <TabsContent value="users"><UserManagementTab /></TabsContent>}
-        </Tabs>
+                {/* ── Profile Tab ── */}
+                <TabsContent value="profile" className="outline-none space-y-6 animate-in fade-in-50 duration-200">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-bold text-zinc-100">Profile Details</h3>
+                    <p className="text-sm text-zinc-400">Update your personal details and how others see you on the platform.</p>
+                  </div>
+                  <form onSubmit={handleSaveProfile} className="space-y-4 max-w-4xl">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name" className="text-zinc-300">Full Name</Label>
+                        <Input id="name" value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} className={inputClass} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone" className="text-zinc-300">Phone</Label>
+                        <Input id="phone" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} className={inputClass} />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-zinc-300">Email Address</Label>
+                      <Input id="email" type="email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} className={inputClass} />
+                    </div>
+                    <Button type="submit" disabled={savingProfile} className="bg-primary hover:bg-primary/95 text-primary-foreground font-semibold px-6 py-2 transition-all disabled:opacity-50">
+                      {savingProfile ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                      Save Changes
+                    </Button>
+                  </form>
+                </TabsContent>
+
+                {/* ── Company Tab ── */}
+                <TabsContent value="company" className="outline-none space-y-6 animate-in fade-in-50 duration-200">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-bold text-zinc-100">Company Details</h3>
+                    <p className="text-sm text-zinc-400">Manage your organization&apos;s legal and public information.</p>
+                  </div>
+                  <form onSubmit={handleSaveCompany} className="space-y-4 max-w-4xl">
+                    <div className="space-y-2">
+                      <Label htmlFor="companyName" className="text-zinc-300">Company Name</Label>
+                      <Input id="companyName" value={company.companyName} onChange={(e) => setCompany({ ...company, companyName: e.target.value })} className={inputClass} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="gstin" className="text-zinc-300">GSTIN</Label>
+                      <Input id="gstin" value={company.gstin} onChange={(e) => setCompany({ ...company, gstin: e.target.value })} className={inputClass} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="address" className="text-zinc-300">Address</Label>
+                      <Input id="address" value={company.address} onChange={(e) => setCompany({ ...company, address: e.target.value })} className={inputClass} />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="companyPhone" className="text-zinc-300">Phone</Label>
+                        <Input id="companyPhone" value={company.phone} onChange={(e) => setCompany({ ...company, phone: e.target.value })} className={inputClass} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="companyEmail" className="text-zinc-300">Email</Label>
+                        <Input id="companyEmail" type="email" value={company.email} onChange={(e) => setCompany({ ...company, email: e.target.value })} className={inputClass} />
+                      </div>
+                    </div>
+                    <Button type="submit" disabled={savingCompany} className="bg-primary hover:bg-primary/95 text-primary-foreground font-semibold px-6 py-2 transition-all disabled:opacity-50">
+                      {savingCompany ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                      Update Organization
+                    </Button>
+                  </form>
+                </TabsContent>
+
+                {/* ── Security Tab ── */}
+                <TabsContent value="security" className="outline-none space-y-6 animate-in fade-in-50 duration-200">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-bold text-zinc-100">Security Settings</h3>
+                    <p className="text-sm text-zinc-400">Secure your account with a strong password.</p>
+                  </div>
+                  <form onSubmit={handleChangePassword} className="space-y-4 max-w-4xl">
+                    <div className="space-y-2">
+                      <Label htmlFor="currentPass" className="text-zinc-300">Current Password</Label>
+                      <Input id="currentPass" type="password" value={passwords.currentPassword} onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })} className={inputClass} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="newPass" className="text-zinc-300">New Password</Label>
+                      <Input id="newPass" type="password" value={passwords.newPassword} onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })} className={inputClass} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPass" className="text-zinc-300">Confirm New Password</Label>
+                      <Input id="confirmPass" type="password" value={passwords.confirmPassword} onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })} className={inputClass} />
+                    </div>
+                    <Button type="submit" disabled={savingPassword} className="bg-primary hover:bg-primary/95 text-primary-foreground font-semibold px-6 py-2 transition-all disabled:opacity-50">
+                      {savingPassword ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                      Change Password
+                    </Button>
+                  </form>
+                </TabsContent>
+
+                {/* ── Permissions Tab ── */}
+                {authUser?.role === 'admin' && (
+                <TabsContent value="permissions" className="outline-none space-y-6 animate-in fade-in-50 duration-200">
+                  <div className="flex items-center justify-between max-w-4xl">
+                    <div className="space-y-1">
+                      <h3 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
+                        Permission Matrix
+                      </h3>
+                      <p className="text-sm text-zinc-400">
+                        Configure what each role can do. Admin always has full access.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={clearAll} className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">Clear</Button>
+                      <Button variant="outline" size="sm" onClick={selectAll} className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">Select All</Button>
+                    </div>
+                  </div>
+
+                  {permsLoading ? (
+                    <div className="flex items-center justify-center py-12 text-zinc-400 gap-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                      <p className="text-xs uppercase tracking-wider font-semibold">Loading permissions...</p>
+                    </div>
+                  ) : perms ? (
+                    <div className="max-w-4xl space-y-6">
+                      <div className="rounded-xl border border-zinc-800 overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-zinc-900/60 border-b border-zinc-800">
+                              <th className="text-left text-zinc-400 font-bold px-4 py-3 text-xs uppercase tracking-wider">Module</th>
+                              <th className="text-center text-zinc-400 font-bold px-2 py-3 text-xs uppercase tracking-wider border-l border-zinc-800">Create</th>
+                              <th className="text-center text-zinc-400 font-bold px-2 py-3 text-xs uppercase tracking-wider border-l border-zinc-800">Edit</th>
+                              <th className="text-center text-zinc-400 font-bold px-2 py-3 text-xs uppercase tracking-wider border-l border-zinc-800">Delete</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {MODULES.map((mod) => {
+                              const p = perms[mod] || { create: false, edit: false, delete: false };
+                              return (
+                                <tr key={mod} className="border-b border-zinc-800/60 hover:bg-zinc-900/40 transition-colors">
+                                  <td className="px-4 py-3 text-zinc-100 font-semibold text-sm capitalize">{mod}</td>
+                                  {(['create', 'edit', 'delete'] as const).map((action) => (
+                                    <td key={action} className="px-2 py-3 text-center border-l border-zinc-800/40">
+                                      <input
+                                        type="checkbox"
+                                        checked={p[action]}
+                                        onChange={(e) => setModulePerm(mod, action, e.target.checked)}
+                                        className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-primary focus:ring-primary cursor-pointer accent-[#2388ff]"
+                                      />
+                                    </td>
+                                  ))}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <Button
+                          onClick={handleSavePermissions}
+                          disabled={savingPerms}
+                          className="bg-primary hover:bg-primary/95 text-primary-foreground font-semibold px-6 py-2 transition-all disabled:opacity-50"
+                        >
+                          {savingPerms ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                          Save Permissions
+                        </Button>
+                        <p className="text-[11px] text-zinc-500">
+                          Changes apply immediately after saving. Admin role is not affected.
+                        </p>
+                      </div>
+
+                      <div className="border-t border-zinc-800 pt-6">
+                        <h4 className="text-sm font-bold text-zinc-100 mb-4">User Role Assignment</h4>
+                        <div className="rounded-xl border border-zinc-800 overflow-hidden">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-zinc-900/60 border-b border-zinc-800">
+                                <th className="text-left text-zinc-400 font-bold px-4 py-3 text-xs uppercase tracking-wider">Name</th>
+                                <th className="text-left text-zinc-400 font-bold px-4 py-3 text-xs uppercase tracking-wider">Email</th>
+                                <th className="text-left text-zinc-400 font-bold px-4 py-3 text-xs uppercase tracking-wider">Role</th>
+                                <th className="text-right text-zinc-400 font-bold px-4 py-3 text-xs uppercase tracking-wider">Change Role</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {users.map((u: any) => (
+                                <tr key={u._id} className="border-b border-zinc-800/60 hover:bg-zinc-900/40 transition-colors">
+                                  <td className="px-4 py-3 text-zinc-100 font-semibold text-sm">{u.name}</td>
+                                  <td className="px-4 py-3 text-zinc-400 text-sm">{u.email}</td>
+                                  <td className="px-4 py-3">
+                                    <span className={cn("text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border", roleColors[u.role])}>
+                                      {u.role}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <select
+                                      value={u.role}
+                                      onChange={(e) => handleRoleChange(u._id, e.target.value)}
+                                      disabled={updatingRole === u._id}
+                                      className={cn("bg-zinc-900/60 border border-zinc-800 text-zinc-100 rounded-lg px-3 py-1.5 text-xs font-semibold outline-none cursor-pointer focus:ring-1 focus:ring-primary", updatingRole === u._id && "opacity-50 cursor-not-allowed")}
+                                      style={{ colorScheme: "dark" }}
+                                    >
+                                      <option value="admin" className="bg-zinc-900">Admin</option>
+                                      <option value="manager" className="bg-zinc-900">Manager</option>
+                                    </select>
+                                    {updatingRole === u._id && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary inline-block ml-2" />}
+                                  </td>
+                                </tr>
+                              ))}
+                              {users.length === 0 && (
+                                <tr>
+                                  <td colSpan={4} className="px-4 py-10 text-center text-zinc-500">No users found</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </TabsContent>
+                )}
+              </Tabs>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );

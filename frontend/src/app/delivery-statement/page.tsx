@@ -4,11 +4,13 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Printer, X, Plus, Trash2, Save, Edit as EditIcon, Loader2, Download, ArrowLeft } from "lucide-react";
+import { Printer, X, Plus, Trash2, Save, Edit as EditIcon, Loader2, Download, ArrowLeft, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { useHeader } from "@/context/HeaderContext";
+import { fetchTemplate, fillTemplate } from "@/lib/template-utils";
+import { generateAndSendPDF } from "@/lib/whatsapp";
 
 type DsRow = {
   id?: number | string;
@@ -37,6 +39,7 @@ export default function DeliveryStatementPage() {
   const [dateSearch] = useState(() => new Date().toISOString().slice(0, 10));
 
   const [matchCount, setMatchCount] = useState(0);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(false);
@@ -188,7 +191,8 @@ export default function DeliveryStatementPage() {
     return totals;
   };
 
-  const buildDsHtml = () => {
+  const buildDsHtml = async (): Promise<string> => {
+    const t = getColumnTotals();
     const tableRows = rows.map((r, idx) => `
       <tr>
         <td class="tc">${r.sno || idx + 1}</td>
@@ -201,79 +205,119 @@ export default function DeliveryStatementPage() {
         <td class="tr">${total(r)}</td>
       </tr>`).join("");
 
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Delivery Statement</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    @page { size: A4 landscape; margin: 8mm; }
-    body { margin: 0; padding: 20px; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
-    .page { background: white; padding: 15px; border: 2px solid black; min-height: 100vh; page-break-after: always; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid black; font-size: 10px; padding: 4px 6px; }
-    th { text-transform: uppercase; font-weight: bold; background: #e8ecf0; }
-    thead { display: table-header-group; }
-    tr { page-break-inside: avoid; }
-    .tc { text-align: center; }
-    .tr { text-align: right; }
-    @media print {
-      body { background: white; padding: 0; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .no-print { display: none; }
-      .page { border: none; margin: 0; padding: 10px; }
+    let totalsRow = "";
+    if (t.total > 0) {
+      totalsRow = `
+      <tr style="font-weight:bold;background:#e8ecf0;">
+        <td class="tc">Total</td>
+        <td></td>
+        <td class="tr">${t.freight}</td>
+        <td class="tr">${t.labour}</td>
+        <td class="tr">${t.receiptCh}</td>
+        <td class="tr">${t.dCom}</td>
+        <td class="tr">${t.demurage}</td>
+        <td class="tr">${t.total}</td>
+      </tr>`;
     }
-  </style>
-</head>
-<body>
-  <div class="no-print mb-4" style="text-align:center;">
-    <button onclick="window.print()" style="background:#000;color:#fff;border:none;padding:8px 24px;font-size:13px;font-weight:600;border-radius:4px;cursor:pointer;">Print Statement</button>
-  </div>
-  <div class="page">
-    <div class="text-center leading-tight mb-3">
-      <h1 style="font-size:24px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;">Sant Kanwar Ram</h1>
-      <h2 style="font-size:18px;font-weight:600;text-transform:uppercase;">Transport Corporation</h2>
-      <p style="font-size:11px;text-transform:uppercase;letter-spacing:2px;">Bhilwara (Raj.)</p>
-      <h3 style="font-size:16px;font-weight:bold;text-transform:uppercase;margin-top:4px;">Delivery Statement</h3>
-    </div>
-    <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:8px;padding:0 4px;">
-      <span>Date: ${dateSearch || "—"}</span>
-      <span>Page: ${pageNo || "—"}</span>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th style="width:4%">S.</th>
-          <th style="width:10%">D.R. No.</th>
-          <th style="width:13%">Freight</th>
-          <th style="width:13%">Labour</th>
-          <th style="width:15%">Stationery</th>
-          <th style="width:15%">Commission</th>
-          <th style="width:15%">A.O.C</th>
-          <th style="width:15%">Total</th>
-        </tr>
-      </thead>
-      <tbody>${tableRows}</tbody>
-    </table>
-  </div>
-</body>
-</html>`;
+
+    const template = await fetchTemplate("delivery_statement");
+    return fillTemplate(template, {
+      DATE: dateSearch || "—",
+      PAGE_NO: pageNo || "—",
+      TABLE_ROWS: tableRows,
+      TOTALS_ROW: totalsRow,
+    });
   };
 
-  const handlePrint = () => {
+  const buildDsPdfContent = () => {
+    const t = getColumnTotals();
+    const tableRows = rows.map((r, idx) => `
+      <tr>
+        <td class="tc">${r.sno || idx + 1}</td>
+        <td>${r.drNo}</td>
+        <td class="tr">${r.freight}</td>
+        <td class="tr">${r.labour}</td>
+        <td class="tr">${r.receiptCh}</td>
+        <td class="tr">${r.dCom}</td>
+        <td class="tr">${r.demurage}</td>
+        <td class="tr">${total(r)}</td>
+      </tr>`).join("");
+    const footerRow = t.total > 0 ? `
+      <tr style="font-weight:bold;">
+        <td class="tc" colspan="2">Total</td>
+        <td class="tr">${t.freight}</td>
+        <td class="tr">${t.labour}</td>
+        <td class="tr">${t.receiptCh}</td>
+        <td class="tr">${t.dCom}</td>
+        <td class="tr">${t.demurage}</td>
+        <td class="tr">${t.total}</td>
+      </tr>` : "";
+    return `
+      <div style="font-family:Arial,sans-serif;background:white;padding:15px;width:1200px;">
+        <style>
+          table { width:100%; border-collapse:collapse; }
+          th, td { border:1px solid black; font-size:10px; padding:4px 6px; }
+          th { text-transform:uppercase; font-weight:bold; background:#e8ecf0; }
+          .tc { text-align:center; }
+          .tr { text-align:right; }
+        </style>
+        <div style="text-align:center;margin-bottom:8px;">
+          <div style="font-size:24px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;">Sant Kanwar Ram</div>
+          <div style="font-size:18px;font-weight:600;text-transform:uppercase;">Transport Corporation</div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;">Bhilwara (Raj.)</div>
+          <div style="font-size:16px;font-weight:bold;text-transform:uppercase;margin-top:4px;">Delivery Statement</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:8px;padding:0 4px;">
+          <span>Date: ${dateSearch || "—"}</span>
+          <span>Page: ${pageNo || "—"}</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:4%">S.</th>
+              <th style="width:10%">D.R. No.</th>
+              <th style="width:13%">Freight</th>
+              <th style="width:13%">Labour</th>
+              <th style="width:15%">Stationery</th>
+              <th style="width:15%">Commission</th>
+              <th style="width:15%">A.O.C</th>
+              <th style="width:15%">Total</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}${footerRow}</tbody>
+        </table>
+      </div>`;
+  };
+
+  const handleShareWhatsApp = async () => {
+    setSendingWhatsApp(true);
+    try {
+      const phone = prompt("Enter WhatsApp number to send this Delivery Statement:");
+      if (!phone) { setSendingWhatsApp(false); return; }
+      const html = await buildDsHtml();
+      await generateAndSendPDF(phone, html, `delivery-statement-${dateSearch}.pdf`, "landscape");
+    } catch {
+      // error handled by generateAndSendPDF
+    } finally {
+      setSendingWhatsApp(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    const html = await buildDsHtml();
     const pw = window.open("", "_blank");
     if (!pw) return;
-    pw.document.write(buildDsHtml());
+    pw.document.write(html);
     pw.document.close();
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
+    const html = await buildDsHtml();
     const pw = window.open("", "_blank");
     if (!pw) return;
-    const html = buildDsHtml().replace("</body>", `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
+    const pdfHtml = html.replace("</body>", `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
 <script>window.onload=function(){html2pdf().set({margin:10,filename:'delivery-statement.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,letterRendering:true},jsPDF:{unit:'mm',format:'a4',orientation:'landscape'}}).from(document.body).save();};<\/script></body>`);
-    pw.document.write(html);
+    pw.document.write(pdfHtml);
     pw.document.close();
   };
 
@@ -331,7 +375,7 @@ export default function DeliveryStatementPage() {
         }
       `}</style>
 
-      <div className="space-y-6 px-8 py-8 h-full max-w-full">
+      <div className="space-y-6 px-4 md:px-8 py-4 md:py-8 h-full max-w-full">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
@@ -378,6 +422,10 @@ export default function DeliveryStatementPage() {
             <Button size="sm" onClick={handleDownloadPDF} className="h-9 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold transition-all">
               <Download className="h-4 w-4 mr-1.5" /> Download PDF
             </Button>
+            <Button size="sm" onClick={handleShareWhatsApp} disabled={sendingWhatsApp} className="h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-all">
+              {sendingWhatsApp ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <MessageCircle className="h-4 w-4 mr-1.5" />}
+              {sendingWhatsApp ? "Sending..." : "WhatsApp"}
+            </Button>
           </div>
         </div>
 
@@ -414,7 +462,7 @@ export default function DeliveryStatementPage() {
               <table className="w-full min-w-[900px] border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-800 border-b-2 border-[#2388ff]/60">
-                    <th className="border-r border-slate-700 text-[#2388ff] uppercase font-bold p-2 w-[4%]">S.no</th>
+                    <th className="border-r border-slate-700 text-[#2388ff] font-bold p-2 w-[6%]">S.No</th>
                     <th className="border-r border-slate-700 text-[#2388ff] uppercase font-bold p-2 w-[10%]">D.R. No.</th>
                     <th className="border-r border-slate-700 text-[#2388ff] uppercase font-bold p-2 w-[14%]">Freight</th>
                     <th className="border-r border-slate-700 text-[#2388ff] uppercase font-bold p-2 w-[14%]">Labour</th>

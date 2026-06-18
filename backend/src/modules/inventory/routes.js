@@ -11,19 +11,20 @@ const {
   updateChallan
 } = require('./controller');
 const { protect } = require('../../middleware/authMiddleware');
+const { requirePermission } = require('../../middleware/permissionMiddleware');
 
 router.route('/')
-  .post(protect, createInventory)
+  .post(protect, requirePermission('inventory', 'create'), createInventory)
   .get(protect, getInventories);
 
 router.route('/:id')
   .get(protect, getInventoryById)
-  .put(protect, updateInventory)
-  .delete(protect, deleteInventory);
+  .put(protect, requirePermission('inventory', 'edit'), updateInventory)
+  .delete(protect, requirePermission('inventory', 'delete'), deleteInventory);
 
 router.route('/:id/challan')
-  .post(protect, generateChallan)
+  .post(protect, requirePermission('inventory', 'create'), generateChallan)
   .get(protect, getChallan)
-  .put(protect, updateChallan);
+  .put(protect, requirePermission('inventory', 'edit'), updateChallan);
 
 module.exports = router;

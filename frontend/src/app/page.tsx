@@ -15,10 +15,10 @@ export default function LandingPage() {
       <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-background/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
-              <Truck className="w-6 h-6 text-primary-foreground" />
+            <div className="w-20 h-20  rounded-xl flex items-center justify-center ">
+              <img src="logobg.png" alt="Logo" />
             </div>
-            <span className="text-xl font-bold tracking-tight">SKRT</span>
+      
           </div>
           <div className="hidden md:flex items-center gap-8">
             <Link href="#features" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Features</Link>

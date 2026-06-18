@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { getInvoices, createInvoice } = require('./controller');
-const { protect, authorize } = require('../../middleware/authMiddleware');
+const { protect } = require('../../middleware/authMiddleware');
+const { requirePermission } = require('../../middleware/permissionMiddleware');
 
 router.route('/')
   .get(protect, getInvoices)
-  .post(protect, authorize('admin', 'manager', 'operator'), createInvoice);
+  .post(protect, requirePermission('invoices', 'create'), createInvoice);
 
 module.exports = router;

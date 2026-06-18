@@ -9,21 +9,21 @@ const parseNumber = (value) => {
 // Helper: Generate Unique Consignment Number
 async function generateUniqueConsignmentNumber() {
   const lastShipment = await Shipment.findOne({
-    consignmentNumber: /^SKRT\d+$/
+    consignmentNumber: /^SK-\d+$/
   }).sort({ createdAt: -1 });
 
   let nextNumber = 1;
 
   if (lastShipment?.consignmentNumber) {
-    const lastNumber = parseInt(lastShipment.consignmentNumber.replace('SKRT', ''), 10);
+    const lastNumber = parseInt(lastShipment.consignmentNumber.replace('SK-', ''), 10);
     nextNumber = lastNumber + 1;
   }
 
-  let consignmentNumber = `SKRT${String(nextNumber).padStart(6, '0')}`;
+  let consignmentNumber = `SK-${String(nextNumber).padStart(2, '0')}`;
 
   while (await Shipment.exists({ consignmentNumber })) {
     nextNumber++;
-    consignmentNumber = `SKRT${String(nextNumber).padStart(6, '0')}`;
+    consignmentNumber = `SK-${String(nextNumber).padStart(2, '0')}`;
   }
 
   return consignmentNumber;

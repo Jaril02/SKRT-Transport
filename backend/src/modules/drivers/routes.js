@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { getDrivers, getDriverById, createDriver, createDriverEntry, getDriverEntries } = require('./controller');
-const { protect, authorize } = require('../../middleware/authMiddleware');
+const { protect } = require('../../middleware/authMiddleware');
+const { requirePermission } = require('../../middleware/permissionMiddleware');
 
 router.route('/')
   .get(protect, getDrivers)
-  .post(protect, authorize('admin', 'manager'), createDriver);
+  .post(protect, requirePermission('drivers', 'create'), createDriver);
 
 router.route('/entry')
   .post(protect, createDriverEntry)

@@ -39,7 +39,9 @@ import {
   Filter,
   Download,
   Printer,
-  FileText
+  FileText,
+  MessageCircle,
+  Loader2
 } from "lucide-react";
 
 import { CreateShipmentDialog } from "@/components/shipments/CreateShipmentDialog";
@@ -48,6 +50,7 @@ import { ViewContactDialog } from "@/components/shipments/ViewContactDialog";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { useHeader } from "@/context/HeaderContext";
+import { generateAndSendPDF } from "@/lib/whatsapp";
 import {
   Select,
   SelectContent,
@@ -101,7 +104,7 @@ function buildReceiptHtml(shipment: any): string {
       <table>
         <tr>
           <td colspan="6">
-            <div class="company">Sant Kanwar Ram Transport Corporation(BHL.)</div>
+            <div class="company">Sant Kanwar Ram Transport Corporation</div>
             <div class="sub">
               123,124 Transport Nagar, Bhilwara - 311001 (Raj.)<br>
               Mob: 96809-92567 / 86196-06627<br>
@@ -115,7 +118,7 @@ function buildReceiptHtml(shipment: any): string {
                 <td class="bold">GR No: ${shipment.consignmentNumber || '—'}</td>
               </tr>
               <tr>
-                <td class="bold">From: BHILWARA (BHL)</td>
+                <td class="bold">From: BHILWARA (BLW)</td>
                 <td class="bold">To: ${(shipment.toBranch || '—').toUpperCase()}</td>
               </tr>
             </table>
@@ -132,7 +135,7 @@ function buildReceiptHtml(shipment: any): string {
           </td>
         </tr>
         <tr>
-          <td class="center bold" width="10%">Packages</td>,
+          <td class="center bold" width="10%">Packages</td>
           <td class="center bold" colspan="3">Description</td>
           <td class="center bold">Weight Actual</td>
           <td class="center bold">Weight Charged</td>
@@ -147,7 +150,7 @@ function buildReceiptHtml(shipment: any): string {
           <td>
             Freight<br>
             Cartags<br>
-            Hamali<br>
+            Labour<br>
             St.Ch.<br>
             Misc.
           </td>
@@ -175,14 +178,13 @@ function buildReceiptHtml(shipment: any): string {
             4. Subject to Bhilwara jurisdiction only
           </td>
           <td colspan="2" class="copy-box">${copyLabel}</td>
-          <td class="sign">For Sant Kanwar Ram Transport Corp. (BHL.),<br><br>Sign</td>
+          <td class="sign">For Sant Kanwar Ram Transport Corp.,<br><br>Sign</td>
         </tr>
       </table>
     </div>`;
 
   const copies = ["ORIGINAL COPY", "RECORD COPY", "DRIVER COPY"];
   const allReceipts = copies.map(c => buildCopy(c)).join("");
-
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -191,8 +193,8 @@ function buildReceiptHtml(shipment: any): string {
   <title>Receipt - ${shipment.consignmentNumber || ''}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif;}
-    body{background:#f3f3f3;padding:20px;}
-    .receipt{width:1000px;margin:0 auto 25px auto;background:#fff;border:2px solid #000;}
+    body{background:#fff;padding:0;margin:0;}
+    .receipt{width:1000px;margin:0 auto 12px auto;background:#fff;border:2px solid #000;}
     table{width:100%;border-collapse:collapse;}
     td{border:1px solid #000;padding:6px;vertical-align:top;font-size:14px;}
     .company{text-align:center;font-size:28px;font-weight:bold;font-family:"Times New Roman",serif;margin-bottom:5px;}
@@ -203,10 +205,12 @@ function buildReceiptHtml(shipment: any): string {
     .terms{font-size:12px;line-height:1.6;}
     .sign{height:90px;text-align:center;vertical-align:bottom;padding-bottom:10px;}
     .charges td{height:32px;}
-    @media print{body{background:#fff;padding:0;}.receipt{margin-bottom:15px;}}
+    @page{size:A4 portrait;margin:5mm;}
+    @media print{body{background:#fff;padding:0;margin:0;}.receipt{margin:0 auto 2px auto;}.receipt:last-child{page-break-after:avoid;break-after:avoid;}}
+    @media not print{body{padding:0;margin:0;}.pdf-scale{transform:scale(0.7);transform-origin:top left;width:1000px;}.receipt{margin:0 auto 4px auto;}}
   </style>
 </head>
-<body>${allReceipts}</body>
+<body><div class="pdf-scale">${allReceipts}</div></body>
 </html>`;
 }
 
@@ -222,7 +226,9 @@ export default function ShipmentsPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [viewConsignorOpen, setViewConsignorOpen] = useState(false);
   const [viewConsigneeOpen, setViewConsigneeOpen] = useState(false);
+
   const fetchLock = React.useRef(false);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState<string | null>(null);
 
   const fetchShipments = async () => {
     if (fetchLock.current) return;
@@ -241,42 +247,15 @@ export default function ShipmentsPage() {
     }
   };
 
-  const [highlightVal, setHighlightVal] = useState<string | null>(null);
-
   React.useEffect(() => {
     fetchShipments();
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const highlightParam = params.get("highlight");
-      if (highlightParam) {
-        setHighlightVal(highlightParam);
-      } else {
-        setHighlightVal(null);
-      }
-    }
   }, []);
 
-  React.useEffect(() => {
-    if (highlightVal && shipmentList.length > 0) {
-      const elementId = `row-shipment-${highlightVal}`;
-      const timer = setTimeout(() => {
-        const el = document.getElementById(elementId);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-          el.classList.add("animate-row-blink");
-          setTimeout(() => {
-            el.classList.remove("animate-row-blink");
-          }, 3000);
-        }
-      }, 400);
-      return () => clearTimeout(timer);
-    }
-  }, [highlightVal, shipmentList]);
-
   const exportCSV = () => {
-    const headers = ["Consignment No", "Consignor", "Consignee", "Branch", "Package Type", "Quantity", "Charged Weight", "Payment Mode", "Freight", "Status", "Outgoing Status"];
+    const headers = ["Consignment No", "Vehicle", "Consignor", "Consignee", "Branch", "Package Type", "Quantity", "Charged Weight", "Payment Mode", "Freight", "Status", "Outgoing Status"];
     const rows = filteredShipments.map((s: any) => [
       s.consignmentNumber || s.shipmentId || s.id || "",
+      s.vehicleNumber || "",
       s.consignor?.name || s.sender?.name || s.sender || "",
       s.consignee?.name || s.receiver?.name || s.receiver || "",
       s.toBranch || s.origin || "",
@@ -303,18 +282,14 @@ export default function ShipmentsPage() {
   };
 
   const filteredShipments = shipmentList.filter((s) => {
-    const lowerSearch = searchQuery.toLowerCase().trim();
+    const lowerSearch = searchQuery.toLowerCase();
     if (!lowerSearch) return true;
-    
-    const idMatch = String(s.consignmentNumber || s.shipmentId || s.id || "").toLowerCase().includes(lowerSearch);
-    
-    const consignorName = s.consignor?.name || s.sender?.name || s.sender || "";
-    const consignorMatch = String(consignorName).toLowerCase().includes(lowerSearch);
-    
-    const consigneeName = s.consignee?.name || s.receiver?.name || s.receiver || "";
-    const consigneeMatch = String(consigneeName).toLowerCase().includes(lowerSearch);
-    
-    return idMatch || consignorMatch || consigneeMatch;
+    const idMatch = s.consignmentNumber?.toLowerCase().includes(lowerSearch) || false;
+    const consignorMatch = s.consignor?.name?.toLowerCase().includes(lowerSearch) || s.consignor?.gst?.toLowerCase().includes(lowerSearch) || false;
+    const consigneeMatch = s.consignee?.name?.toLowerCase().includes(lowerSearch) || s.consignee?.gst?.toLowerCase().includes(lowerSearch) || false;
+    const branchMatch = s.toBranch?.toLowerCase().includes(lowerSearch) || false;
+    const vehicleMatch = s.vehicleNumber?.toLowerCase().includes(lowerSearch) || false;
+    return idMatch || consignorMatch || consigneeMatch || branchMatch || vehicleMatch;
   });
 
   const handleOutgoingStatusChange = useCallback(async (shipmentId: string, newStatus: string) => {
@@ -336,18 +311,22 @@ export default function ShipmentsPage() {
     }
   }, []);
 
+  const handleSendWhatsApp = useCallback(async (shipment: any) => {
+    setSendingWhatsApp(shipment._id);
+    try {
+      const phone = prompt("Enter client WhatsApp number (with or without country code):");
+      if (!phone) { setSendingWhatsApp(null); return; }
+      const html = buildReceiptHtml(shipment);
+      await generateAndSendPDF(phone, html, `receipt-${shipment.consignmentNumber || shipment.shipmentId || shipment._id}.pdf`, "portrait");
+    } catch {
+      // error already handled by generateAndSendPDF
+    } finally {
+      setSendingWhatsApp(null);
+    }
+  }, []);
+
   return (
     <DashboardLayout>
-      <style>{`
-        @keyframes row-blink {
-          0%, 100% { background-color: transparent; }
-          25%, 75% { background-color: rgba(35, 136, 255, 0.4); }
-          50% { background-color: rgba(35, 136, 255, 0.15); }
-        }
-        .animate-row-blink {
-          animation: row-blink 1.2s ease-in-out 2 !important;
-        }
-      `}</style>
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -384,6 +363,7 @@ export default function ShipmentsPage() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent border-border/50">
                   <TableHead className="text-[10px] w-[13%]">Consignment No</TableHead>
+                  <TableHead className="text-[10px] w-[8%]">Vehicle</TableHead>
                   <TableHead className="text-[10px] w-[11%]">Consignor</TableHead>
                   <TableHead className="text-[10px] w-[11%]">Consignee</TableHead>
                   <TableHead className="text-[10px] w-[8%]">Branch</TableHead>
@@ -399,8 +379,9 @@ export default function ShipmentsPage() {
               </TableHeader>
               <TableBody>
                 {filteredShipments.map((shipment: any) => (
-                  <TableRow key={shipment._id || shipment.id} id={`row-shipment-${shipment.consignmentNumber}`} className="border-border/50 hover:bg-white/5 transition-colors">
+                  <TableRow key={shipment._id || shipment.id} className="border-border/50 hover:bg-white/5 transition-colors">
                     <TableCell className="font-medium text-primary text-[10px] whitespace-nowrap">{shipment.consignmentNumber || shipment.shipmentId || shipment.id}</TableCell>
+                    <TableCell className="font-mono text-[10px] text-foreground/90 font-bold whitespace-nowrap">{shipment.vehicleNumber || '-'}</TableCell>
                     <TableCell className="text-[10px] whitespace-nowrap">{shipment.consignor?.name || shipment.sender?.name || shipment.sender || '-'}</TableCell>
                     <TableCell className="text-[10px] whitespace-nowrap">{shipment.consignee?.name || shipment.receiver?.name || shipment.receiver || '-'}</TableCell>
                     <TableCell className="text-[10px] whitespace-nowrap">{shipment.toBranch || shipment.origin || '-'}</TableCell>
@@ -465,6 +446,18 @@ export default function ShipmentsPage() {
                               onClick={() => handlePrintReceipt(shipment)}
                             >
                               <Printer className="h-4 w-4 mr-2 text-foreground" /> Print Receipt
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={() => handleSendWhatsApp(shipment)}
+                              disabled={sendingWhatsApp === shipment._id}
+                            >
+                              {sendingWhatsApp === shipment._id ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin text-green-400" />
+                              ) : (
+                                <MessageCircle className="h-4 w-4 mr-2 text-green-400" />
+                              )}
+                              Send via WhatsApp
                             </DropdownMenuItem>
 
                             <DropdownMenuSeparator />

@@ -4,11 +4,13 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Printer, X, Plus, Trash2, Save, Edit as EditIcon, Loader2, Download, ArrowLeft } from "lucide-react";
+import { Printer, X, Plus, Trash2, Save, Edit as EditIcon, Loader2, Download, ArrowLeft, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useHeader } from "@/context/HeaderContext";
+import { generateAndSendPDF } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
+import { getSlipTotal as getSlipTotalFromUtil, buildSummaryPrintHtml } from "@/lib/summary-html";
 
 type SummaryRow = {
   id?: number | string;
@@ -72,6 +74,8 @@ export default function SummaryPage() {
   const [date] = useState(today());
   const [matchCount, setMatchCount] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [waPhone, setWaPhone] = useState("");
+  const [sendingWa, setSendingWa] = useState(false);
   const [rows, setRows] = useState<SummaryRow[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [vehicleList, setVehicleList] = useState<string[]>([]);
@@ -191,325 +195,14 @@ export default function SummaryPage() {
   };
 
   const getSlipTotal = (r: SummaryRow) => {
-    const fareDelivery = parseFloat(r.fareDelivery) || 0;
-    const crossingFare = parseFloat(r.crossingFare) || 0;
-    const deliveryCommission = parseFloat(r.deliveryCommission) || 0;
-    const crossing = parseFloat(r.crossing) || 0;
-    const labor = parseFloat(r.labor) || 0;
-    return fareDelivery + crossingFare + deliveryCommission - crossing - labor;
+    return getSlipTotalFromUtil(r);
   };
 
   const buildSummaryHtml = () => {
-    const formatDate = (ds: string) => {
-      if (!ds) return "";
-      const p = ds.split("-");
-      return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : ds;
-    };
-    const filledRows = rows.filter(r =>
-      r.truckNo || r.driverName || r.from || r.to ||
-      r.transportName || r.challanNo || r.totalCount ||
-      r.fareDelivery || r.crossing || r.crossingFare ||
-      r.labor || r.deliveryCommission || r.credit || r.debit || r.note || r.note2
-    );
-    const slipsHtml = filledRows.map((r, idx) => {
-      const credit = parseFloat(r.credit) || 0;
-      const debit = parseFloat(r.debit) || 0;
-      const total = getSlipTotal(r);
-      return `
-      <div class="slip-paper">
-        <div class="slip-contacts">
-          <span class="mob-left">Mob. 96809-92567</span>
-          <span class="mob-right">Mob.: 86196-06627</span>
-        </div>
-        <div class="slip-tagline">All disputes subject to Bhilwara jurisdiction</div>
-        <div class="slip-headers">
-          <h2 class="company-title-en">SANT KANWAR RAM TRANSPORT CORP. (BHL.)</h2>
-          <p class="company-address">Bhilwara - 311001 (Raj.)</p>
-        </div>
-        <div class="slip-subtitle-container">
-          <div class="subtitle-line"></div>
-          <span class="slip-subtitle">SUMMARY</span>
-          <div class="subtitle-line"></div>
-        </div>
-        <div class="slip-metadata">
-          <div class="meta-item serial">
-            <span class="label">No.</span>
-            <span class="colon">:</span>
-            <span class="value stamped-num">${r.sno || idx + 1}</span>
-          </div>
-          <div class="meta-item date">
-            <span class="label">Date</span>
-            <span class="dotted-spacer-inline"></span>
-            <span class="value written-text">${formatDate(date)}</span>
-          </div>
-        </div>
-        <div class="slip-fields-grid">
-          <div class="field-row double">
-            <div class="field-col">
-              <span class="field-label">Truck No.</span>
-              <span class="dotted-underlines-spacer"></span>
-              <span class="field-value written-text">${r.truckNo}</span>
-            </div>
-            <div class="field-col">
-              <span class="field-label">Driver Name</span>
-              <span class="dotted-underlines-spacer"></span>
-              <span class="field-value written-text">${r.driverName}</span>
-            </div>
-          </div>
-          <div class="field-row double">
-            <div class="field-col">
-              <span class="field-label">From</span>
-              <span class="dotted-underlines-spacer"></span>
-              <span class="field-value written-text">${r.from}</span>
-            </div>
-            <div class="field-col">
-              <span class="field-label">To</span>
-              <span class="dotted-underlines-spacer"></span>
-              <span class="field-value written-text">${r.to}</span>
-            </div>
-          </div>
-          <div class="field-row double">
-            <div class="field-col">
-              <span class="field-label">Transport Name</span>
-              <span class="dotted-underlines-spacer"></span>
-              <span class="field-value written-text">${r.transportName}</span>
-            </div>
-            <div class="field-col">
-              <span class="field-label">Challan No.</span>
-              <span class="dotted-underlines-spacer"></span>
-              <span class="field-value written-text">${r.challanNo}</span>
-            </div>
-          </div>
-          <div class="field-row single">
-            <div class="field-col">
-              <span class="field-label">Total Count</span>
-              <span class="dotted-underlines-spacer"></span>
-              <span class="field-value written-text">${r.totalCount}</span>
-            </div>
-          </div>
-          <div class="field-row double">
-            <div class="field-col">
-              <span class="field-label">Fare Delivery</span>
-              <span class="dotted-underlines-spacer"></span>
-              <span class="field-value written-text currency">${r.fareDelivery}</span>
-            </div>
-            <div class="field-col">
-              <span class="field-label">Crossing</span>
-              <span class="dotted-underlines-spacer"></span>
-              <span class="field-value written-text currency">${r.crossing}</span>
-            </div>
-          </div>
-          <div class="field-row double">
-            <div class="field-col">
-              <span class="field-label">Crossing Fare</span>
-              <span class="dotted-underlines-spacer"></span>
-              <span class="field-value written-text currency">${r.crossingFare}</span>
-            </div>
-            <div class="field-col">
-              <span class="field-label">Labor</span>
-              <span class="dotted-underlines-spacer"></span>
-              <span class="field-value written-text currency">${r.labor}</span>
-            </div>
-          </div>
-          <!-- DELIVERY COMMISSION -->
-<div style="padding:4px 0;width:100%;">
-  <div style="
-    display:flex;
-    align-items:center;
-    width:100%;
-    gap:10px;
-    font-size:14.5px;
-    font-weight:700;
-  ">
-    <span style="white-space:nowrap;">
-      Delivery Commission
-    </span>
-    <div style="
-      flex:1;
-      border-bottom:1px dotted #000;
-      position:relative;
-      height:24px;
-    ">
-      <span style="
-        position:absolute;
-        left:10px;
-        top:-2px;
-        padding:0 4px;
-      ">
-        ₹ ${r.deliveryCommission}
-      </span>
-    </div>
-  </div>
-</div>
-<!-- NOTE -->
-<div style="padding:4px 0;width:100%;">
-  <div style="display:flex;align-items:center;width:100%;gap:10px;font-size:14.5px;font-weight:700;">
-    <span style="white-space:nowrap;">Note</span>
-    <div style="flex:1;border-bottom:1px dotted #000;position:relative;height:24px;">
-      <span style="position:absolute;left:10px;top:-2px;padding:0 4px;">${r.note || '—'}</span>
-    </div>
-  </div>
-</div>
-<!-- ADJUSTMENTS separator -->
-<div style="display:flex;align-items:center;gap:8px;padding:6px 0 2px 0;">
-  <div style="flex:1;height:1px;background:rgba(0,0,0,0.15);"></div>
-  <span style="font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;opacity:0.5;">Adjustments</span>
-  <div style="flex:1;height:1px;background:rgba(0,0,0,0.15);"></div>
-</div>
-<!-- CREDIT -->
-<div style="padding:4px 0;width:100%;">
-  <div style="display:flex;align-items:center;width:100%;gap:10px;font-size:14.5px;font-weight:700;">
-    <span style="white-space:nowrap;">Credit</span>
-    <div style="flex:1;border-bottom:1px dotted #000;position:relative;height:24px;">
-      <span style="position:absolute;left:10px;top:-2px;padding:0 4px;">${r.credit ? '₹ ' + r.credit : '—'}</span>
-    </div>
-  </div>
-</div>
-<!-- DEBIT -->
-<div style="padding:4px 0;width:100%;">
-  <div style="display:flex;align-items:center;width:100%;gap:10px;font-size:14.5px;font-weight:700;">
-    <span style="white-space:nowrap;">Debit</span>
-    <div style="flex:1;border-bottom:1px dotted #000;position:relative;height:24px;">
-      <span style="position:absolute;left:10px;top:-2px;padding:0 4px;">${r.debit ? '₹ ' + r.debit : '—'}</span>
-    </div>
-  </div>
-</div>
-<!-- NOTE -->
-<div style="padding:4px 0;width:100%;">
-  <div style="display:flex;align-items:center;width:100%;gap:10px;font-size:14.5px;font-weight:700;">
-    <span style="white-space:nowrap;">Note</span>
-    <div style="flex:1;border-bottom:1px dotted #000;position:relative;height:24px;">
-      <span style="position:absolute;left:10px;top:-2px;padding:0 4px;">${r.note2 || '—'}</span>
-    </div>
-  </div>
-</div>
-<!-- GRAND TOTAL -->
-<div style="padding:8px 0;width:100%;border-top:1.5px solid var(--slip-ink-print);margin-top:10px;">
-  <div style="display:flex;align-items:center;width:100%;justify-content:space-between;font-size:16px;font-weight:900;">
-    <span style="text-transform:uppercase;letter-spacing:1px;">Grand Total</span>
-    <span>₹ ${total > 0 ? total.toFixed(2) : '—'}</span>
-  </div>
-</div>
-        </div>
-        <div class="slip-footer">
-          <div class="signature-driver">Driver Signature</div>
-          <div class="signature-company">For Sant Kanwar Ram Transport Corp. (BHL.)</div>
-        </div>
-      </div>`;
-    }).join("");
-
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Summary</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Hind:wght@400;500;700&family=Kalam:wght@700&family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --slip-paper-bg: #ffaec1;
-      --slip-paper-gradient: linear-gradient(135deg, #ffb8c8 0%, #ffa3b7 100%);
-      --slip-ink-print: #111e54;
-      --slip-ink-write-blue: #0b22a2;
-      --slip-ink-stamp: #d32f2f;
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Poppins', sans-serif; background: #f3f4f6; padding: 20px; }
-    .no-print { text-align: center; margin-bottom: 20px; }
-    .no-print button { background: #111e54; color: #fff; border: none; padding: 10px 30px; font-size: 14px; font-weight: 600; border-radius: 6px; cursor: pointer; }
-    .slip-paper {
-      width: 600px; height: 850px;
-      background: var(--slip-paper-bg);
-      background-image: var(--slip-paper-gradient);
-      color: var(--slip-ink-print);
-      border-radius: 2px;
-      box-shadow: 0 15px 35px rgba(0,0,0,0.4), 0 5px 15px rgba(0,0,0,0.2);
-      position: relative;
-      padding: 30px 40px;
-      display: flex;
-      flex-direction: column;
-      margin: 0 auto 60px;
-      page-break-after: always;
-    }
-    .slip-contacts { display: flex; justify-content: space-between; font-size: 13px; font-weight: 500; margin-bottom: 4px; letter-spacing: 0.5px; }
-    .slip-tagline { text-align: center; font-size: 11px; font-family: 'Hind', sans-serif; font-weight: 500; margin-bottom: 6px; }
-    .slip-headers { text-align: center; display: flex; flex-direction: column; gap: 4px; }
-    .company-title-en { font-family: 'Poppins', sans-serif; font-size: 18.5px; font-weight: 800; letter-spacing: 0.3px; }
-    .company-address { font-family: 'Hind', sans-serif; font-size: 13.5px; font-weight: 500; }
-    .slip-subtitle-container { display: flex; align-items: center; justify-content: center; margin: 12px 0 16px 0; }
-    .subtitle-line { flex-grow: 1; height: 1.5px; background-color: var(--slip-ink-print); }
-    .slip-subtitle { font-family: 'Hind', sans-serif; font-size: 17px; font-weight: 700; padding: 0 16px; letter-spacing: 1px; }
-    .slip-metadata { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; font-size: 14px; }
-    .meta-item { display: flex; align-items: flex-end; position: relative; }
-    .meta-item.serial { font-family: 'Hind', sans-serif; font-weight: 700; }
-    .meta-item.serial .colon { margin: 0 15px; font-weight: 400; }
-    .meta-item.date { font-family: 'Hind', sans-serif; font-weight: 700; flex-grow: 1; max-width: 250px; justify-content: flex-end; }
-    .dotted-spacer-inline { flex-grow: 1; border-bottom: 1.5px dotted var(--slip-ink-print); height: 1px; margin: 0 10px 4px 10px; opacity: 0.7; }
-    .stamped-num { font-family: 'Poppins', sans-serif; font-size: 22px; font-weight: 800; color: var(--slip-ink-stamp); letter-spacing: 1px; display: inline-block; transform: rotate(-3deg) scale(1.05); margin-left: 2px; text-shadow: 0.5px 0.5px 0px rgba(0,0,0,0.1); }
-    .slip-fields-grid { display: flex; flex-direction: column; gap: 16px; flex-grow: 1; }
-    .field-row { display: flex; gap: 24px; width: 100%; }
-    .field-row.double .field-col { width: 50%; }
-    .field-row.single .field-col { width: 100%; }
-    .field-row.indent-more { padding-left: 15%; }
-    .field-col { display: flex; position: relative; align-items: flex-end; flex-grow: 1; }
-    .field-col {
-        display: flex;
-        align-items: center;
-        flex-grow: 1;
-        gap: 8px;
-      }
-
-      .field-label {
-        font-family: 'Hind', sans-serif;
-        font-weight: 700;
-        font-size: 14.5px;
-        white-space: nowrap;
-        min-width: 65px;
-      }
-
-      .dotted-underlines-spacer {
-        flex-grow: 1;
-        border-bottom: 1.5px dotted var(--slip-ink-print);
-        height: 1px;
-        margin-top: 10px;
-      }
-
-      .written-text {
-        position: absolute;
-        left: 120px;   /* adjust according to label */
-        bottom: 2px;
-        font-family: Arial, sans-serif;
-        font-size: 15px;
-        font-weight: 700;
-        color: #000;
-        background: transparent;
-        padding: 0 4px;
-        max-width: 60%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-    .written-text.currency:not(:empty)::before { content: "₹ "; font-size: 15px; font-family: 'Poppins', sans-serif; font-weight: 500; }
-    .slip-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; margin-bottom: 10px; font-family: 'Hind', sans-serif; font-weight: 700; font-size: 14px; }
-    @media print {
-      body { background: #fff; padding: 0; }
-      .no-print { display: none !important; }
-      .slip-paper { box-shadow: none; border: none; margin: 0 auto; page-break-after: always; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .stamped-num { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .written-text { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    }
-  </style>
-</head>
-<body>
-  <div class="no-print">
-    <button onclick="window.print()">Print Summary</button>
-  </div>
-  ${slipsHtml}
-</body>
-</html>`;
+    return buildSummaryPrintHtml(rows, date);
   };
+
+
 
   const handlePrint = () => {
     const pw = window.open("", "_blank");
@@ -569,6 +262,19 @@ export default function SummaryPage() {
     const success = await handleSave();
     if (success) {
       handlePrint();
+    }
+  };
+
+  const handleWhatsApp = async () => {
+    if (!waPhone.trim()) { toast.error("Enter a WhatsApp number"); return; }
+    setSendingWa(true);
+    try {
+      const html = buildSummaryHtml();
+      await generateAndSendPDF(waPhone, html, `summary-${date}.pdf`);
+    } catch {
+      // handled by generateAndSendPDF
+    } finally {
+      setSendingWa(false);
     }
   };
 
@@ -650,6 +356,23 @@ export default function SummaryPage() {
             <Button size="sm" onClick={handleDownloadPDF} className="h-9 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold transition-all">
               <Download className="h-4 w-4 mr-1" /> PDF
             </Button>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={waPhone}
+                onChange={(e) => setWaPhone(e.target.value)}
+                placeholder="Phone"
+                className="h-9 w-28 bg-slate-800 border border-slate-700 rounded-lg px-2.5 text-xs text-white outline-none placeholder:text-slate-500"
+              />
+              <Button
+                size="sm"
+                onClick={handleWhatsApp}
+                disabled={sendingWa || !waPhone.trim()}
+                className="h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-1.5 transition-all"
+              >
+                {sendingWa ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -674,9 +397,9 @@ export default function SummaryPage() {
 
                 <div className="p-6 md:p-7">
                   {/* ── Contact strip ── */}
-                  <div className="flex justify-between text-[10px] text-[#2388ff]/60 font-medium tracking-wide mb-1">
-                    <span>Mob. 96809-92567</span>
-                    <span>Mob.: 86196-06627</span>
+                  <div className="flex flex-col items-end text-[9px] text-[#2388ff]/60 font-semibold mb-1 uppercase tracking-wide">
+                    <span>Mob. 96809-92567</span><br/>
+                    <span>Mob. 86196-06627</span>
                   </div>
                   <div className="text-center text-[9px] text-slate-500/80 mb-3 italic tracking-wide">
                     All disputes subject to Bhilwara jurisdiction
@@ -894,4 +617,4 @@ export default function SummaryPage() {
       </div>
     </DashboardLayout>
   );
-}
+} 

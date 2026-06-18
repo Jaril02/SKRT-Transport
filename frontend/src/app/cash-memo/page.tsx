@@ -6,9 +6,11 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Printer, Download, Save, Plus, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Printer, Download, Save, Plus, CheckCircle2, ArrowLeft, MessageCircle, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { fetchCashMemoTemplate, fillCashMemoTemplate } from "@/lib/cash-memo-template";
+import { generateAndSendPDF } from "@/lib/whatsapp";
 
 const today = () => {
   const d = new Date();
@@ -48,6 +50,8 @@ export default function CashMemoPage() {
   const router = useRouter();
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
+  const [waPhone, setWaPhone] = useState("");
+  const [sendingWa, setSendingWa] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
   const totalRs = amountFields.reduce((sum, f) => sum + (parseFloat(form[f.key] as string) || 0), 0);
@@ -168,99 +172,46 @@ export default function CashMemoPage() {
     }
   };
 
-  const r = (v: any) => v || "";
+  const buildCashMemoHtml = async (): Promise<string> => {
+    const template = await fetchCashMemoTemplate();
+    return fillCashMemoTemplate(template, {
+      drNo: form.drNo,
+      grNo: form.grNo,
+      date: form.date,
+      receivedOn: form.receivedOn,
+      from: form.from,
+      consignee: form.consignee,
+      through: form.through,
+      freight: form.freight || "",
+      freightP: form.freightPaise || "",
+      labour: form.labour || "",
+      labourP: form.labourPaise || "",
+      stationery: form.stationery || "5",
+      stationeryP: form.stationeryPaise || "00",
+      commission: form.commission || "",
+      commissionP: form.commissionPaise || "",
+      aoc: form.aoc || "5",
+      aocP: form.aocPaise || "00",
+      total: String(totalWhole),
+      totalP: String(totalPaise).padStart(2, "0"),
+    });
+  };
 
-  const buildCashMemoHtml = () => `<!DOCTYPE html>
-<html>
-<head>
-<style>
-    @page { size: A4 portrait; margin: 8mm; }
-    body { font-family: Arial, sans-serif; margin:0; padding:10px; background:#f3f4f6; }
-    .page { border: 2px solid #000; width: 100%; max-width: 700px; padding: 15px; margin: 10px auto; position: relative; background:white; box-sizing:border-box; }
-    .header-top { display: flex; justify-content: space-between; align-items: center; }
-    .dr-no { font-size: 18px; font-weight: bold; color: #333; }
-    .contact { font-size: 14px; font-weight: bold; }
-    .title { text-align: center; font-size: 24px; font-weight: bold; color: #000080; margin-top: 10px; }
-    .subtitle { text-align: center; font-size: 16px; color: #000080; margin-bottom: 20px; }
-    .form-line { display: flex; margin-bottom: 10px; align-items: center; }
-    .label { font-weight: bold; width: 80px; font-size: 13px; }
-    .input-line { border-bottom: 1px solid black; flex-grow: 1; height: 1.2em; }
-    .table-container { border: 1px solid black; margin-top: 20px; width: 100%; }
-    .table-container table { width: 100%; border-collapse: collapse; }
-    .table-container th, .table-container td { text-align: left; padding: 6px; }
-    .table-container th { border-bottom: 1px solid black; font-size: 16px; text-align: center; }
-    .table-container tr { height: 28px; }
-    .signature { text-align: right; margin-top: 30px; font-weight: bold; }
-    @media print { body { background: #fff; padding: 0; } .page { max-width: 100%; margin: 0; border: none; } }
-</style>
-</head>
-<body>
-<div class="page">
-    <div class="header-top">
-        <div class="dr-no">D.R. No. <span style="color:red;">${r(form.drNo)}</span></div>
-        <div class="header-title"><span style="font-weight:bold;font-size:18px;">CASH MEMO</span></div>
-        <div style="font-size:11px; font-weight:bold; text-align: right; color:#000000; line-height: 1.4; padding-right: 10px; white-space: nowrap;">
-            <span>Mob.: 96809-92567</span><br/>
-            <span>Mob.: 86196-06627</span>
-        </div>
-    </div>
-    <div class="title">Sant Kanwar Ram Transport Corp. (BHL.)</div>
-    <div class="subtitle">123-124, Transport Nagar, BHILWARA - 311001 (Raj.)</div>
-    <div class="form-line">
-        <div class="label">G.R. No.</div>
-        <div class="input-line">${r(form.grNo)}</div>
-        <div style="width:110px;text-align:right;font-weight:bold;white-space:nowrap;padding-right:6px;">Received on</div>
-        <div class="input-line" style="width:200px;flex-shrink:0;">${r(form.receivedOn)}</div>
-    </div>
-    <div class="form-line">
-        <div class="label">From</div>
-        <div class="input-line">${r(form.from)}</div>
-        <div style="width:110px;text-align:right;font-weight:bold;white-space:nowrap;padding-right:6px;">Dt.</div>
-          -line" style="width:200px;flex-shrink:0;">${r(form.date)}</div>
-    </div>
-    <div class="form-line">
-        <div class="label">Consignee</div>
-        <div class="input-line">${r(form.consignee)}</div>
-    </div>
-    <div class="form-line">
-        <div class="label">Through</div>
-        <div class="input-line">${r(form.through)}</div>
-    </div>
-    <div class="table-container">
-        <table>
-            <thead><tr><th style="width:70%;"></th><th style="width:15%;">Rs.</th><th style="width:15%;">P.</th></tr></thead>
-            <tbody>
-                <tr><td>Freight</td><td style="border-left:1px solid black;">${r(form.freight)}</td><td style="border-left:1px solid black;">${r(form.freightPaise)}</td></tr>
-                <tr><td>Labour</td><td style="border-left:1px solid black;">${r(form.labour)}</td><td style="border-left:1px solid black;">${r(form.labourPaise)}</td></tr>
-                <tr><td>Stationery</td><td style="border-left:1px solid black;">${r(form.stationery) || "5"}</td><td style="border-left:1px solid black;">${r(form.stationeryPaise) || "00"}</td></tr>
-                <tr><td>Commission</td><td style="border-left:1px solid black;">${r(form.commission)}</td><td style="border-left:1px solid black;">${r(form.commissionPaise)}</td></tr>
-                <tr><td>A.O.C.</td><td style="border-left:1px solid black;">${r(form.aoc) || "5"}</td><td style="border-left:1px solid black;">${r(form.aocPaise) || "0"}</td></tr>
-                <tr style="border-top:1px solid black;">
-                    <td style="font-weight:bold;">Total</td>
-                    <td style="border-left:1px solid black;">${totalWhole}</td>
-                    <td style="border-left:1px solid black;">${String(totalPaise).padStart(2, "0")}</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    <div class="signature">D. Clerk</div>
-</div>
-</body>
-</html>`
-
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    const html = await buildCashMemoHtml();
     const pw = window.open("", "_blank");
     if (!pw) return;
-    pw.document.write(buildCashMemoHtml());
+    pw.document.write(html);
     pw.document.close();
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
+    const html = await buildCashMemoHtml();
     const pw = window.open("", "_blank");
     if (!pw) return;
-    const html = buildCashMemoHtml().replace("</body>", `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
+    const pdfHtml = html.replace("</body>", `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
 <script>window.onload=function(){html2pdf().set({margin:10,filename:'cash-memo.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,letterRendering:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(document.body).save();};<\/script></body>`);
-    pw.document.write(html);
+    pw.document.write(pdfHtml);
     pw.document.close();
   };
 
@@ -268,6 +219,19 @@ export default function CashMemoPage() {
     const success = await handleSave();
     if (success) {
       handlePrint();
+    }
+  };
+
+  const handleWhatsApp = async () => {
+    if (!waPhone.trim()) { toast.error("Enter a WhatsApp number"); return; }
+    setSendingWa(true);
+    try {
+      const html = await buildCashMemoHtml();
+      await generateAndSendPDF(waPhone, html, `cash-memo-${form.drNo}.pdf`);
+    } catch {
+      // handled by generateAndSendPDF
+    } finally {
+      setSendingWa(false);
     }
   };
 
@@ -300,7 +264,7 @@ export default function CashMemoPage() {
         }
       `}</style>
 
-      <div className="space-y-6 px-8 py-8">
+      <div className="space-y-6 px-4 md:px-8 py-4 md:py-8">
         {/* Page header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -349,6 +313,23 @@ export default function CashMemoPage() {
             >
               <Download className="h-4 w-4" /> Download PDF
             </Button>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={waPhone}
+                onChange={(e) => setWaPhone(e.target.value)}
+                placeholder="Phone"
+                className="h-9 w-28 bg-slate-800 border border-slate-700 rounded-lg px-2.5 text-xs text-white outline-none placeholder:text-slate-500"
+              />
+              <Button
+                size="sm"
+                onClick={handleWhatsApp}
+                disabled={sendingWa || !waPhone.trim()}
+                className="h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-1.5 transition-all"
+              >
+                {sendingWa ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -401,7 +382,7 @@ export default function CashMemoPage() {
                       <input value={form.grNo} onChange={(e) => set("grNo", e.target.value)} placeholder="GR-4521" className="flex-1 border-0 border-b border-blue-800 bg-transparent text-sm text-white outline-none px-1 py-1 min-w-0 placeholder:text-slate-500 placeholder:italic" />
                     </div>
                     <div className="flex items-end gap-2">
-                      <span className="text-sm font-bold text-[#2388ff] whitespace-nowrap min-w-[30px]">Dt.</span>
+                      <span className="text-sm font-bold text-[#2388ff] whitespace-nowrap min-w-[30px]">Dt</span>
                       <input type="date" value={form.date} onChange={(e) => set("date", e.target.value)} className="flex-1 border-0 border-b border-blue-800 bg-transparent text-sm text-white outline-none px-1 py-1 min-w-0" style={{ colorScheme: "dark" }} />
                     </div>
                   </div>
@@ -474,7 +455,6 @@ export default function CashMemoPage() {
               {/* Bottom row */}
               <div className="flex justify-end items-end mt-8 pt-4 border-t border-blue-900/50">
                 <div className="text-sm font-bold text-slate-400 text-center">
-                  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                   <span className="block border-t border-slate-600 mt-6 pt-1">D. Clerk</span>
                 </div>
               </div>

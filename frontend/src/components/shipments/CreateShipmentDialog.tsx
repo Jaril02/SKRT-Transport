@@ -24,7 +24,7 @@ import api from "@/lib/api";
 import { toast } from "sonner";
 
 function formatConsignmentNumber(index: number) {
-  return `SKRT${String(index).padStart(6, '0')}`;
+  return `SK-${String(index).padStart(3, '0')}`;
 }
 
 export function CreateShipmentDialog({

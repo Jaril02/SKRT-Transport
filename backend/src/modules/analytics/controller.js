@@ -3,6 +3,7 @@ const Vehicle = require('../vehicles/model');
 const Client = require('../clients/model');
 const User = require('../auth/model');
 const Inventory = require('../inventory/model');
+const Expense = require('../expenses/model');
 const sendResponse = require('../../utils/response');
 
 exports.getDashboardStats = async (req, res) => {
@@ -144,6 +145,104 @@ exports.getDetailedAnalytics = async (req, res) => {
       monthlyData,
       topRoutes,
       statusBreakdown
+    });
+  } catch (error) {
+    return sendResponse(res, 500, false, error.message);
+  }
+};
+
+exports.getAnalysis = async (req, res) => {
+  try {
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
+    twelveMonthsAgo.setDate(1);
+    twelveMonthsAgo.setHours(0, 0, 0, 0);
+
+    const [
+      totalRevenueAgg,
+      totalExpensesAgg,
+      activeShipments,
+      monthlyRevenueRaw,
+      monthlyExpensesRaw,
+      topRoutes,
+      topClientsRaw,
+      recentShipments
+    ] = await Promise.all([
+      Shipment.aggregate([{ $group: { _id: null, total: { $sum: '$totalPayable' } } }]),
+      Expense.aggregate([{ $group: { _id: null, total: { $sum: '$amount' } } }]),
+      Shipment.countDocuments({ status: 'In Transit' }),
+      Shipment.aggregate([
+        { $match: { createdAt: { $gte: twelveMonthsAgo } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+            revenue: { $sum: '$totalPayable' },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
+      Expense.aggregate([
+        { $match: { date: { $gte: twelveMonthsAgo } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m', date: '$date' } },
+            total: { $sum: '$amount' }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
+      Shipment.aggregate([
+        { $group: { _id: '$toBranch', count: { $sum: 1 }, revenue: { $sum: '$totalPayable' } } },
+        { $sort: { count: -1 } },
+        { $limit: 7 }
+      ]),
+      Shipment.aggregate([
+        {
+          $group: {
+            _id: '$consignor.name',
+            revenue: { $sum: '$totalPayable' },
+            shipments: { $sum: 1 }
+          }
+        },
+        { $sort: { revenue: -1 } },
+        { $limit: 7 }
+      ]),
+      Shipment.find().sort({ createdAt: -1 }).limit(10).lean()
+    ]);
+
+    const totalRevenue = totalRevenueAgg.length > 0 ? totalRevenueAgg[0].total : 0;
+    const totalExpenses = totalExpensesAgg.length > 0 ? totalExpensesAgg[0].total : 0;
+    const netProfit = totalRevenue - totalExpenses;
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    const revenueExpenseData = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const rev = monthlyRevenueRaw.find(m => m._id === key);
+      const exp = monthlyExpensesRaw.find(m => m._id === key);
+      revenueExpenseData.push({
+        name: monthNames[d.getMonth()],
+        revenue: rev ? rev.revenue : 0,
+        expenses: exp ? exp.total : 0
+      });
+    }
+
+    return sendResponse(res, 200, true, 'Analysis fetched successfully', {
+      kpi: {
+        totalRevenue,
+        totalExpenses,
+        netProfit,
+        activeShipments
+      },
+      revenueExpenseData,
+      topRoutes: topRoutes.map(r => ({ name: r._id || 'Unknown', count: r.count, revenue: r.revenue })),
+      topClients: topClientsRaw.map(c => ({ name: c._id || 'Unknown', revenue: c.revenue, shipments: c.shipments })),
+      recentShipments
     });
   } catch (error) {
     return sendResponse(res, 500, false, error.message);

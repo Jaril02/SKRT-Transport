@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import api from "@/lib/api";
 import { useHeader } from "@/context/HeaderContext";
+import { fetchTemplate, fillTemplate } from "@/lib/template-utils";
 
 type EntryRow = {
   id?: number | string;
@@ -215,16 +216,7 @@ export default function EntryRegisterPage() {
     }
   };
 
-  const buildEntryHtml = () => {
-    const header = `
-      <div class="text-center leading-tight mb-3">
-        <h1 class="text-3xl font-bold uppercase tracking-wide">Sant Kanwar Ram</h1>
-        <h2 class="text-2xl font-semibold uppercase">Transport Corporation</h2>
-        <p class="text-sm uppercase tracking-widest">Bhilwara (Raj.)</p>
-        <h3 class="text-2xl font-bold uppercase mt-1">Delivery Register</h3>
-      </div>
-    `;
-
+  const buildEntryHtml = async (): Promise<string> => {
     const tableRows = rows.map((r, idx) => `
       <tr>
         <td class="text-center">${r.sno || idx + 1}</td>
@@ -241,75 +233,33 @@ export default function EntryRegisterPage() {
       </tr>
     `).join("");
 
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Delivery Register</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    @page { size: A3 landscape; margin: 8mm; }
-    body { margin: 0; padding: 20px; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
-    .page { background: white; padding: 20px; border: 2px solid black; min-height: 100vh; page-break-after: always; }
-    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    th, td { border: 1px solid black; font-size: 10px; height: 28px; padding: 2px; }
-    th { text-transform: uppercase; font-weight: bold; }
-    thead { display: table-header-group; }
-    tr { page-break-inside: avoid; }
-    @media print {
-      body { background: white; padding: 0; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .no-print { display: none; }
-      .page { border: none; margin: 0; padding: 10px; }
-    }
-  </style>
-</head>
-<body>
-  <div class="no-print mb-4">
-    <button onclick="window.print()" class="bg-black text-white px-5 py-2 rounded-lg">Print Register</button>
-  </div>
-  <div class="page">${header}
-    <div class="flex justify-between text-sm font-semibold mb-2 px-4">
-      <span>Challan No: ${challanNo || "—"}</span>
-      <span>From: ${fromField || "—"} | To: ${toField || "—"} | Vehicle: ${vehicleNo || "—"}</span>
-      <span>Date: ${dateSearch || "—"} | Page: ${pageNo || "—"}</span>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th style="width:4%">S. No.</th>
-          <th style="width:7%">From</th>
-          <th style="width:7%">To</th>
-          <th style="width:9%">G.R No.</th>
-          <th style="width:13%">Consignor</th>
-          <th style="width:13%">Consignee</th>
-          <th style="width:8%">No. of Packages</th>
-          <th style="width:12%">Contents</th>
-          <th style="width:7%">Freight</th>
-          <th style="width:10%">Delivery Receipt No.</th>
-          <th style="width:10%">Date of Delivery</th>
-        </tr>
-      </thead>
-      <tbody>${tableRows}</tbody>
-    </table>
-  </div>
-</body>
-</html>`;
+    const template = await fetchTemplate("delivery_register");
+    return fillTemplate(template, {
+      CHALLAN_NO: challanNo || "—",
+      FROM: fromField || "—",
+      TO: toField || "—",
+      VEHICLE_NO: vehicleNo || "—",
+      DATE: dateSearch || "—",
+      PAGE_NO: pageNo || "—",
+      TABLE_ROWS: tableRows,
+    });
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    const html = await buildEntryHtml();
     const pw = window.open("", "_blank");
     if (!pw) return;
-    pw.document.write(buildEntryHtml());
+    pw.document.write(html);
     pw.document.close();
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
+    const html = await buildEntryHtml();
     const pw = window.open("", "_blank");
     if (!pw) return;
-    const html = buildEntryHtml().replace("</body>", `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
+    const pdfHtml = html.replace("</body>", `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
 <script>window.onload=function(){html2pdf().set({margin:5,filename:'delivery-register.pdf'}).from(document.body).save();};<\/script></body>`);
-    pw.document.write(html);
+    pw.document.write(pdfHtml);
     pw.document.close();
   };
 
@@ -554,7 +504,7 @@ export default function EntryRegisterPage() {
         }
       `}</style>
 
-      <div className="space-y-6 px-8 py-8 h-full max-w-full">
+      <div className="space-y-6 px-4 md:px-8 py-4 md:py-8 h-full max-w-full">
         {/* Page header & Actions */}
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div className="flex items-center gap-3">

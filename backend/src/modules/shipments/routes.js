@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { createShipment, getShipments, getShipmentById, updateShipment, deleteShipment, updateStatus, getNextNumber } = require('./controller');
-const { protect, authorize } = require('../../middleware/authMiddleware');
+const { protect } = require('../../middleware/authMiddleware');
+const { requirePermission } = require('../../middleware/permissionMiddleware');
 
 router.route('/')
-  .post(protect, authorize('admin', 'manager', 'operator'), createShipment)
+  .post(protect, requirePermission('shipments', 'create'), createShipment)
   .get(protect, getShipments);
 
 router.route('/next-number')
@@ -12,10 +13,10 @@ router.route('/next-number')
 
 router.route('/:id')
   .get(protect, getShipmentById)
-  .put(protect, authorize('admin', 'manager', 'operator'), updateShipment)
-  .delete(protect, authorize('admin', 'manager', 'operator'), deleteShipment);
+  .put(protect, requirePermission('shipments', 'edit'), updateShipment)
+  .delete(protect, requirePermission('shipments', 'delete'), deleteShipment);
 
 router.route('/:id/status')
-  .patch(protect, authorize('admin', 'manager', 'operator'), updateStatus);
+  .patch(protect, requirePermission('shipments', 'edit'), updateStatus);
 
 module.exports = router;
