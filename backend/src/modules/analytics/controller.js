@@ -22,7 +22,8 @@ exports.getDashboardStats = async (req, res) => {
       totalDrivers,
       totalInventory,
       revenueAgg,
-      recentShipments
+      recentShipments,
+      inventoryStatusBreakdown
     ] = await Promise.all([
       Shipment.countDocuments(),
       Shipment.countDocuments({ status: 'In Transit' }),
@@ -40,7 +41,11 @@ exports.getDashboardStats = async (req, res) => {
         { $group: { _id: null, total: { $sum: '$totalPayable' } } }
       ]),
       // Recent 5 shipments
-      Shipment.find().sort({ createdAt: -1 }).limit(5).lean()
+      Shipment.find().sort({ createdAt: -1 }).limit(5).lean(),
+      // Inventory status breakdown
+      Inventory.aggregate([
+        { $group: { _id: '$incomingStatus', count: { $sum: 1 } } }
+      ])
     ]);
 
     const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].total : 0;
@@ -58,7 +63,8 @@ exports.getDashboardStats = async (req, res) => {
       totalDrivers,
       totalInventory,
       totalRevenue,
-      recentShipments
+      recentShipments,
+      inventoryStatusBreakdown
     });
   } catch (error) {
     return sendResponse(res, 500, false, error.message);
@@ -140,11 +146,37 @@ exports.getDetailedAnalytics = async (req, res) => {
       { $group: { _id: '$status', count: { $sum: 1 } } }
     ]);
 
+    // Weekly inventory inflow (last 7 days)
+    const weeklyInventoryInflow = await Inventory.aggregate([
+      { $match: { createdAt: { $gte: sevenDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    const weeklyInvData = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const found = weeklyInventoryInflow.find(w => w._id === dateStr);
+      weeklyInvData.push({
+        name: dayLabels[d.getDay()],
+        date: dateStr,
+        count: found ? found.count : 0
+      });
+    }
+
     return sendResponse(res, 200, true, 'Detailed analytics fetched successfully', {
       weeklyData: days,
       monthlyData,
       topRoutes,
-      statusBreakdown
+      statusBreakdown,
+      weeklyInventoryData: weeklyInvData
     });
   } catch (error) {
     return sendResponse(res, 500, false, error.message);

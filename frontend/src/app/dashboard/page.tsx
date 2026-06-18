@@ -16,7 +16,8 @@ import {
   Box,
   ArrowUpRight,
   ArrowDownRight,
-  Clock
+  Clock,
+  ListChecks
 } from "lucide-react";
 import {
   BarChart,
@@ -42,6 +43,14 @@ const STATUS_COLORS: Record<string, string> = {
   Pending:    "#94a3b8"
 };
 
+const INV_STATUS_COLORS: Record<string, string> = {
+  "N/A":                   "#94a3b8",
+  "Pending":               "#f59e0b",
+  "Received":              "#3b82f6",
+  "Arrived at Warehouse":  "#8b5cf6",
+  "Checked In":            "#10b981"
+};
+
 export default function DashboardPage() {
   const [stats, setStats]         = React.useState<any>(null);
   const [chartData, setChartData] = React.useState<any>(null);
@@ -64,6 +73,13 @@ export default function DashboardPage() {
     };
     fetchAll();
   }, []);
+
+  const getInvCount = (status: string) => {
+    const found = stats?.inventoryStatusBreakdown?.find((d: any) => d._id === status);
+    return found ? found.count : 0;
+  };
+  const pendingInv = getInvCount("Pending") + getInvCount("N/A");
+  const checkedInInv = getInvCount("Checked In") + getInvCount("Received") + getInvCount("Arrived at Warehouse");
 
   const statCards = stats
     ? [
@@ -103,11 +119,25 @@ export default function DashboardPage() {
           color:   "text-purple-400"
         },
         {
-          label:   "Inventory Items",
+          label:   "Total Inventory",
           value:   stats.totalInventory ?? "0",
-          sub:     "in warehouse",
+          sub:     "all items",
           icon:    Box,
           color:   "text-pink-400"
+        },
+        {
+          label:   "Pending",
+          value:   pendingInv,
+          sub:     "not yet received",
+          icon:    Clock,
+          color:   "text-amber-400"
+        },
+        {
+          label:   "Checked In",
+          value:   checkedInInv,
+          sub:     "ready in warehouse",
+          icon:    ListChecks,
+          color:   "text-emerald-400"
         }
       ]
     : [];
@@ -119,6 +149,12 @@ export default function DashboardPage() {
         { name: "Delivered",  value: stats.deliveredShipments  ?? 0 },
         { name: "Cancelled",  value: stats.cancelledShipments  ?? 0 }
       ].filter(d => d.value > 0)
+    : [];
+
+  const invPieData = stats?.inventoryStatusBreakdown
+    ? stats.inventoryStatusBreakdown
+        .map((d: any) => ({ name: d._id, value: d.count }))
+        .filter((d: any) => d.value > 0)
     : [];
 
   return (
@@ -133,13 +169,13 @@ export default function DashboardPage() {
 
         {/* Stat Cards */}
         {loading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {[1,2,3,4,5,6].map(i => (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+            {[1,2,3,4,5,6,7,8].map(i => (
               <Card key={i} className="h-32 animate-pulse bg-secondary/10 border-border/50" />
             ))}
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
             {statCards.map((stat, i) => (
               <Card key={i} className="border-border/50 bg-secondary/20 backdrop-blur-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -160,7 +196,7 @@ export default function DashboardPage() {
         {/* Charts Row */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
           {/* Weekly Shipments + Revenue Chart */}
-          <Card className="lg:col-span-4 border-border/50 bg-secondary/20 backdrop-blur-sm">
+          <Card className="lg:col-span-7 border-border/50 bg-secondary/20 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Weekly Shipments & Revenue (Last 7 Days)</CardTitle>
             </CardHeader>
@@ -199,10 +235,49 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Shipment Status Pie Chart */}
+        </div>
+
+        {/* Inventory Charts Row */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+          {/* Weekly Inventory Inflow */}
+          <Card className="lg:col-span-4 border-border/50 bg-secondary/20 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle>Weekly Inventory Inflow (Last 7 Days)</CardTitle>
+            </CardHeader>
+            <CardContent className="pl-2">
+              <div className="h-[300px]">
+                {loading ? (
+                  <div className="h-full flex items-center justify-center text-muted-foreground animate-pulse">
+                    Loading chart data...
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData?.weeklyInventoryData ?? []}>
+                      <defs>
+                        <linearGradient id="colorInvCount" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor="#ec4899" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                      <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: "8px" }}
+                        itemStyle={{ color: "#fff" }}
+                      />
+                      <Area type="monotone" dataKey="count" stroke="#ec4899" fillOpacity={1} fill="url(#colorInvCount)" strokeWidth={2} name="Items" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Inventory Status Pie Chart */}
           <Card className="lg:col-span-3 border-border/50 bg-secondary/20 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle>Shipment Status Breakdown</CardTitle>
+              <CardTitle>Inventory Status Breakdown</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[300px]">
@@ -210,15 +285,15 @@ export default function DashboardPage() {
                   <div className="h-full flex items-center justify-center text-muted-foreground animate-pulse">
                     Loading...
                   </div>
-                ) : pieData.length === 0 ? (
+                ) : invPieData.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-muted-foreground">
-                    No shipments yet
+                    No inventory items
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={pieData}
+                        data={invPieData}
                         cx="50%"
                         cy="50%"
                         innerRadius={70}
@@ -228,10 +303,10 @@ export default function DashboardPage() {
                         label={({ name, value }) => `${name}: ${value}`}
                         labelLine={false}
                       >
-                        {pieData.map((entry, index) => (
+                        {invPieData.map((entry: any, index: number) => (
                           <Cell
-                            key={`cell-${index}`}
-                            fill={STATUS_COLORS[entry.name] ?? "#94a3b8"}
+                            key={`inv-cell-${index}`}
+                            fill={INV_STATUS_COLORS[entry.name] ?? "#94a3b8"}
                           />
                         ))}
                       </Pie>
@@ -244,13 +319,13 @@ export default function DashboardPage() {
                 )}
               </div>
               {/* Legend */}
-              {!loading && (
+              {!loading && invPieData.length > 0 && (
                 <div className="flex flex-wrap gap-3 mt-2 justify-center">
-                  {pieData.map((entry, i) => (
+                  {invPieData.map((entry: any, i: number) => (
                     <div key={i} className="flex items-center gap-1.5 text-xs">
                       <div
                         className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: STATUS_COLORS[entry.name] ?? "#94a3b8" }}
+                        style={{ backgroundColor: INV_STATUS_COLORS[entry.name] ?? "#94a3b8" }}
                       />
                       <span className="text-muted-foreground">{entry.name}</span>
                     </div>
@@ -260,32 +335,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Monthly Revenue Chart */}
-        {!loading && chartData?.monthlyData?.length > 0 && (
-          <Card className="border-border/50 bg-secondary/20 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle>Monthly Revenue Trend</CardTitle>
-            </CardHeader>
-            <CardContent className="pl-2">
-              <div className="h-[250px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData.monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => `₹${(v/1000).toFixed(0)}K`} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: "8px" }}
-                      itemStyle={{ color: "#fff" }}
-                      formatter={(value: any) => [`₹${value.toLocaleString()}`, "Revenue"]}
-                    />
-                    <Bar dataKey="revenue" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Recent Shipments Table */}
         {!loading && stats?.recentShipments?.length > 0 && (
