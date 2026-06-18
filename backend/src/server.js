@@ -32,9 +32,13 @@ io.on('connection', (socket) => {
 // Attach io to app so it can be used in controllers
 app.set('io', io);
 
-// Initialize WhatsApp client
-const whatsappService = require('./modules/whatsapp/service');
-whatsappService.initialize();
+// Initialize WhatsApp client (ignored if Chrome is not available)
+try {
+  const whatsappService = require('./modules/whatsapp/service');
+  whatsappService.initialize();
+} catch (e) {
+  console.log('⚠️ WhatsApp disabled: ' + e.message);
+}
 
 const PORT = process.env.PORT || 5000;
 
