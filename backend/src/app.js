@@ -57,6 +57,7 @@ app.use(async (req, res, next) => {
 });
 
 // ─── Security Middleware ─────────────────────────────────────────────────────
+app.set('trust proxy', 1);
 app.use(helmet());
 
 // CORS

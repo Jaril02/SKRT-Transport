@@ -1,3 +1,4 @@
+const https = require('https');
 const { makeWASocket, Browsers, DisconnectReason, initAuthCreds, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
 const mongoose = require('mongoose');
 const { Binary } = require('bson');
@@ -5,6 +6,8 @@ const { Binary } = require('bson');
 let sock = null;
 let isReady = false;
 let qrCode = null;
+let initLock = false;
+let reconnectAttempts = 0;
 
 const COLLECTION_NAME = 'whatsapp_sessions';
 const KEY_PREFIX = 'key:';
@@ -23,6 +26,11 @@ const binaryToBuffer = (val) => {
 };
 
 const useMongoDBAuthState = async (collection) => {
+  if (process.env.WHATSAPP_FRESH === 'true') {
+    console.log('🧹 WHATSAPP_FRESH mode — clearing session from MongoDB');
+    await collection.drop().catch(() => {});
+    console.log('   ✓ Collection dropped, fresh QR scan required');
+  }
   const credsDoc = await collection.findOne({ _id: 'creds' });
   const rawCreds = credsDoc ? credsDoc.creds : null;
   const creds = rawCreds ? binaryToBuffer(rawCreds) : initAuthCreds();
@@ -74,6 +82,21 @@ const useMongoDBAuthState = async (collection) => {
 };
 
 exports.initialize = async () => {
+  if (initLock) {
+    console.log('⏳ WhatsApp init already in progress, skipping...');
+    return;
+  }
+  initLock = true;
+
+  if (sock) {
+    try {
+      sock.ev.removeAllListeners();
+      sock.end(undefined);
+      sock.close();
+    } catch {}
+    sock = null;
+  }
+
   if (mongoose.connection.readyState !== 1) {
     await new Promise((resolve) => {
       mongoose.connection.once('connected', resolve);
@@ -89,6 +112,7 @@ exports.initialize = async () => {
     browser: Browsers.macOS('Desktop'),
     syncFullHistory: false,
     markOnlineOnConnect: false,
+    agent: new https.Agent({ keepAlive: true, family: 4 }),
   });
 
   sock.ev.on('connection.update', (update) => {
@@ -96,24 +120,30 @@ exports.initialize = async () => {
 
     if (qr) {
       qrCode = qr;
+      reconnectAttempts = 0;
       console.log('📱 QR code received');
     }
 
     if (connection === 'open') {
       isReady = true;
       qrCode = null;
+      reconnectAttempts = 0;
+      initLock = false;
       console.log('✅ WhatsApp client is ready!');
     }
 
     if (connection === 'close') {
       isReady = false;
       qrCode = null;
-      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      if (shouldReconnect) {
-        console.log('🔌 WhatsApp disconnected, reconnecting...');
-        exports.initialize();
-      } else {
+      initLock = false;
+      const isLoggedOut = lastDisconnect?.error?.output?.statusCode === DisconnectReason.loggedOut;
+      if (isLoggedOut) {
         console.log('❌ WhatsApp logged out. Scan QR code again.');
+      } else {
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 60000);
+        reconnectAttempts++;
+        console.log(`🔌 WhatsApp disconnected, reconnecting in ${delay / 1000}s...`);
+        setTimeout(() => exports.initialize(), delay);
       }
     }
   });
