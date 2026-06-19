@@ -32,17 +32,17 @@ io.on('connection', (socket) => {
 // Attach io to app so it can be used in controllers
 app.set('io', io);
 
-// Catch async Chrome crash on Render (whatsapp-web.js throws after tick)
-process.on('unhandledRejection', (err) => {
-  if (err?.message?.includes('Could not find Chrome')) {
-    console.log('⚠️ WhatsApp disabled (Chrome not available on this platform)');
-    return;
-  }
-  console.error('❌ Unhandled Rejection:', err.message);
-});
+const whatsappService = require('./modules/whatsapp/service');
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`\n🚀 SKRT Server running on port ${PORT}`);
+  try {
+    const { connectDB } = require('./app');
+    await connectDB();
+    await whatsappService.initialize();
+  } catch (err) {
+    console.log('⚠️ WhatsApp initialization deferred (DB not ready yet):', err.message);
+  }
 });
