@@ -1,5 +1,6 @@
 const { makeWASocket, Browsers, DisconnectReason, initAuthCreds, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
 const mongoose = require('mongoose');
+const { Binary } = require('bson');
 
 let sock = null;
 let isReady = false;
@@ -8,9 +9,23 @@ let qrCode = null;
 const COLLECTION_NAME = 'whatsapp_sessions';
 const KEY_PREFIX = 'key:';
 
+const binaryToBuffer = (val) => {
+  if (val instanceof Binary) return Buffer.from(val.buffer);
+  if (Buffer.isBuffer(val)) return val;
+  if (val && typeof val === 'object') {
+    if (Array.isArray(val)) return val.map(binaryToBuffer);
+    if (val.constructor !== Object) return val;
+    const result = {};
+    for (const [k, v] of Object.entries(val)) result[k] = binaryToBuffer(v);
+    return result;
+  }
+  return val;
+};
+
 const useMongoDBAuthState = async (collection) => {
   const credsDoc = await collection.findOne({ _id: 'creds' });
-  const creds = credsDoc ? credsDoc.creds : initAuthCreds();
+  const rawCreds = credsDoc ? credsDoc.creds : null;
+  const creds = rawCreds ? binaryToBuffer(rawCreds) : initAuthCreds();
 
   const keys = {
     get: async (type, ids) => {
@@ -20,7 +35,7 @@ const useMongoDBAuthState = async (collection) => {
       const result = {};
       for (const doc of docs) {
         const id = doc._id.replace(`${KEY_PREFIX}${type}:`, '');
-        result[id] = doc.value;
+        result[id] = binaryToBuffer(doc.value);
       }
       return result;
     },
