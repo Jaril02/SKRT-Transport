@@ -1,4 +1,4 @@
-const { makeWASocket, useMongoDBAuthState, Browsers, DisconnectReason } = require('@whiskeysockets/baileys');
+const { makeWASocket, Browsers, DisconnectReason, initAuthCreds, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
 const mongoose = require('mongoose');
 
 let sock = null;
@@ -6,6 +6,57 @@ let isReady = false;
 let qrCode = null;
 
 const COLLECTION_NAME = 'whatsapp_sessions';
+const KEY_PREFIX = 'key:';
+
+const useMongoDBAuthState = async (collection) => {
+  const credsDoc = await collection.findOne({ _id: 'creds' });
+  const creds = credsDoc ? credsDoc.creds : initAuthCreds();
+
+  const keys = {
+    get: async (type, ids) => {
+      const docs = await collection.find({
+        _id: { $in: ids.map(id => `${KEY_PREFIX}${type}:${id}`) }
+      }).toArray();
+      const result = {};
+      for (const doc of docs) {
+        const id = doc._id.replace(`${KEY_PREFIX}${type}:`, '');
+        result[id] = doc.value;
+      }
+      return result;
+    },
+    set: async (data) => {
+      const ops = Object.entries(data).map(([key, value]) => ({
+        updateOne: {
+          filter: { _id: `${KEY_PREFIX}${key}` },
+          update: { $set: { value } },
+          upsert: true,
+        }
+      }));
+      if (ops.length) await collection.bulkWrite(ops);
+    },
+    delete: async (ids) => {
+      await collection.deleteMany({
+        _id: { $in: ids.map(id => `${KEY_PREFIX}${id}`) }
+      });
+    },
+  };
+
+  const saveCreds = async () => {
+    await collection.updateOne(
+      { _id: 'creds' },
+      { $set: { creds } },
+      { upsert: true }
+    );
+  };
+
+  return {
+    state: {
+      creds,
+      keys: makeCacheableSignalKeyStore(keys),
+    },
+    saveCreds,
+  };
+};
 
 exports.initialize = async () => {
   if (mongoose.connection.readyState !== 1) {
