@@ -79,7 +79,22 @@ exports.createShipment = async (req, res) => {
 
     return sendResponse(res, 201, true, 'Shipment created successfully', shipment);
   } catch (error) {
-    return sendResponse(res, 400, false, error.message);
+    return sendResponse(res, 500, false, error.message);
+  }
+};
+
+// @desc    Get shipment by consignment number
+// @route   GET /api/shipments/consignment/:consignmentNo
+// @access  Private
+exports.getByConsignmentNumber = async (req, res) => {
+  try {
+    const shipment = await Shipment.findOne({ consignmentNumber: req.params.consignmentNo });
+    if (!shipment) {
+      return sendResponse(res, 404, false, 'Shipment not found');
+    }
+    return sendResponse(res, 200, true, 'Shipment fetched successfully', shipment);
+  } catch (error) {
+    return sendResponse(res, 500, false, error.message);
   }
 };
 

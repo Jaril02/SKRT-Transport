@@ -11,6 +11,7 @@ import api from "@/lib/api";
 import { useHeader } from "@/context/HeaderContext";
 import { fetchTemplate, fillTemplate } from "@/lib/template-utils";
 import { generateAndSendPDF } from "@/lib/whatsapp";
+import { handleTableCellKeyDown } from "@/lib/tableNavigation";
 
 const today = () => {
   const d = new Date();
@@ -79,19 +80,16 @@ export default function ChallanPage() {
   const [fetchingGr, setFetchingGr] = useState<number | null>(null);
 
   const [charges, setCharges] = useState({
-    commission: "",
-    labour: "",
-    gr: "",
-    crossing: "",
-    truckFreight: "",
-    advance: "",
-    tfCredit: "",
-    totalToPay: "",
-    otherCharge: "",
-    lcdc: "",
-    crossing2: "",
-    doorDelivery: "",
-    balanceFreight: "",
+    commission: "0",
+    truckFreight: "0",
+    advance: "0",
+    tfCredit: "0",
+    totalToPay: "0",
+    otherCharge: "0",
+    lcdc: "0",
+    crossing2: "0",
+    doorDelivery: "0",
+    balanceFreight: "0",
     note: ""
   });
 
@@ -146,6 +144,7 @@ export default function ChallanPage() {
     setFetchingGr(idx);
     let entryData: any = null;
     let cmTotal: string | null = null;
+    let shipmentData: any = null;
 
     try {
       const { data } = await api.get(`/entry/grno/${encodeURIComponent(grNo.trim())}`);
@@ -159,16 +158,22 @@ export default function ChallanPage() {
       }
     } catch { /* ignore */ }
 
+    try {
+      const { data } = await api.get(`/shipments/consignment/${encodeURIComponent(grNo.trim())}`);
+      if (data.success && data.data) shipmentData = data.data;
+    } catch { /* ignore */ }
+
     setRows((prev) => {
       const updated = [...prev];
       updated[idx] = {
         ...updated[idx],
-        pkg: entryData?.noOfPackages || updated[idx].pkg,
-        dest: entryData?.to || updated[idx].dest,
-        content: entryData?.contents || updated[idx].content,
-        consignor: entryData?.consignor || updated[idx].consignor,
-        consignee: entryData?.consignee || updated[idx].consignee,
-        total: cmTotal ?? updated[idx].total,
+        pkg: shipmentData?.quantity ?? entryData?.noOfPackages ?? updated[idx].pkg,
+        dest: shipmentData?.toBranch ?? entryData?.to ?? updated[idx].dest,
+        content: entryData?.contents ?? updated[idx].content,
+        consignor: shipmentData?.consignor?.name ?? entryData?.consignor ?? updated[idx].consignor,
+        consignee: shipmentData?.consignee?.name ?? entryData?.consignee ?? updated[idx].consignee,
+        total: shipmentData?.totalPayable ?? cmTotal ?? updated[idx].total,
+        wt: shipmentData?.chargedWeight ?? updated[idx].wt,
       };
       return updated;
     });
@@ -210,11 +215,12 @@ export default function ChallanPage() {
   const totalWt = rows.reduce((sum, r) => sum + (parseFloat(r.wt) || 0), 0);
 
   const rowsTotal = rows.reduce((sum, r) => sum + (parseFloat(r.total) || 0), 0);
-  const chargeFields = ['commission','labour','gr','crossing','truckFreight','advance','tfCredit','totalToPay','otherCharge','lcdc','crossing2','balanceFreight'];
+  const chargeFields = ['truckFreight','advance','tfCredit','totalToPay','otherCharge','lcdc','crossing2','balanceFreight'];
   const totalDeductions = chargeFields.reduce((sum, f) => sum + (parseFloat((charges as any)[f]) || 0), 0);
   const doorDelivery = parseFloat(charges.doorDelivery) || 0;
 
-  const grandTotal = rowsTotal - totalDeductions + doorDelivery;
+  const commissionVal = parseFloat(charges.commission) || 0;
+  const grandTotal = rowsTotal - totalDeductions + doorDelivery + commissionVal;
 
   const handleSave = async () => {
     setSaving(true);
@@ -243,19 +249,16 @@ export default function ChallanPage() {
         setCustomDriver(false);
         setRows([]); // Clear all table rows (0 rows)
         setCharges({
-          commission: "",
-          labour: "",
-          gr: "",
-          crossing: "",
-          truckFreight: "",
-          advance: "",
-          tfCredit: "",
-          totalToPay: "",
-          otherCharge: "",
-          lcdc: "",
-          crossing2: "",
-          doorDelivery: "",
-          balanceFreight: "",
+          commission: "0",
+          truckFreight: "0",
+          advance: "0",
+          tfCredit: "0",
+          totalToPay: "0",
+          otherCharge: "0",
+          lcdc: "0",
+          crossing2: "0",
+          doorDelivery: "0",
+          balanceFreight: "0",
           note: ""
         });
 
@@ -303,6 +306,7 @@ export default function ChallanPage() {
       TOTAL_PKG: String(totalPkg),
       TOTAL_WT: totalWt.toFixed(1),
       GRAND_TOTAL: grandTotal.toFixed(2),
+      COMMISSION:r(charges.commission),
       TRUCK_FREIGHT: r(charges.truckFreight),
       ADVANCE: r(charges.advance),
       TF_CREDIT: r(charges.tfCredit),
@@ -581,30 +585,33 @@ export default function ChallanPage() {
                           onBlur={() => handleGrBlur(idx, row.grNo)}
                           onChange={(e) => updateRow(idx, 'grNo', e.target.value)}
                           placeholder="GR No"
+                          data-row={idx}
+                          data-col={0}
+                          onKeyDown={(e) => handleTableCellKeyDown(e, idx, 0)}
                           className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600"
                         />
                         {fetchingGr === idx && <Loader2 className="h-3 w-3 animate-spin text-[#2388ff] absolute right-1 top-1/2 -translate-y-1/2" />}
                       </td>
                       <td className="border border-slate-700 p-0">
-                        <input type="number" min="0" value={row.pkg} onChange={(e) => updateRow(idx, 'pkg', e.target.value)} placeholder="0" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
+                        <input type="number" min="0" value={row.pkg} onChange={(e) => updateRow(idx, 'pkg', e.target.value)} placeholder="0" data-row={idx} data-col={1} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 1)} className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
                       </td>
                       <td className="border border-slate-700 p-0">
-                        <input type="text" value={row.dest} onChange={(e) => updateRow(idx, 'dest', e.target.value)} placeholder="City" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
+                        <input type="text" value={row.dest} onChange={(e) => updateRow(idx, 'dest', e.target.value)} placeholder="City" data-row={idx} data-col={2} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 2)} className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
                       </td>
                       <td className="border border-slate-700 p-0">
-                        <input type="text" value={row.content} onChange={(e) => updateRow(idx, 'content', e.target.value)} placeholder="Item" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
+                        <input type="text" value={row.content} onChange={(e) => updateRow(idx, 'content', e.target.value)} placeholder="Item" data-row={idx} data-col={3} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 3)} className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
                       </td>
                       <td className="border border-slate-700 p-0">
-                        <input type="text" value={row.consignor} onChange={(e) => updateRow(idx, 'consignor', e.target.value)} placeholder="Sender" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
+                        <input type="text" value={row.consignor} onChange={(e) => updateRow(idx, 'consignor', e.target.value)} placeholder="Sender" data-row={idx} data-col={4} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 4)} className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
                       </td>
                       <td className="border border-slate-700 p-0">
-                        <input type="text" value={row.consignee} onChange={(e) => updateRow(idx, 'consignee', e.target.value)} placeholder="Receiver" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
+                        <input type="text" value={row.consignee} onChange={(e) => updateRow(idx, 'consignee', e.target.value)} placeholder="Receiver" data-row={idx} data-col={5} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 5)} className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
                       </td>
                       <td className="border border-slate-700 p-0 bg-slate-900/40">
-                        <input type="number" step="0.01" value={row.total} onChange={(e) => updateRow(idx, 'total', e.target.value)} placeholder="0.00" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
+                        <input type="number" step="0.01" value={row.total} onChange={(e) => updateRow(idx, 'total', e.target.value)} placeholder="0.00" data-row={idx} data-col={6} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 6)} className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
                       </td>
                       <td className="border border-slate-700 p-0 bg-slate-900/40">
-                        <input type="number" step="0.01" value={row.wt} onChange={(e) => updateRow(idx, 'wt', e.target.value)} placeholder="0.0" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
+                        <input type="number" step="0.01" value={row.wt} onChange={(e) => updateRow(idx, 'wt', e.target.value)} placeholder="0.0" data-row={idx} data-col={7} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 7)} className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
                       </td>
                       <td className="border border-slate-700 p-0 text-center">
                         <button onClick={() => deleteRow(idx)} className="delete-btn text-rose-500 hover:text-rose-400 p-1.5" title="Remove">
@@ -627,18 +634,7 @@ export default function ChallanPage() {
                 <label className="text-[10px] font-bold text-[#2388ff] uppercase">COMMISSION RS. & P.</label>
                 <input type="number" step="0.01" value={charges.commission} onChange={(e) => setCharges({ ...charges, commission: e.target.value })} placeholder="0.00" className="bg-transparent border-b border-blue-800 text-white text-sm outline-none py-1 placeholder:text-slate-600" />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-[#2388ff] uppercase">LABOUR CHARGE RS.</label>
-                <input type="number" step="0.01" value={charges.labour} onChange={(e) => setCharges({ ...charges, labour: e.target.value })} placeholder="0.00" className="bg-transparent border-b border-blue-800 text-white text-sm outline-none py-1 placeholder:text-slate-600" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-[#2388ff] uppercase">G.R.</label>
-                <input type="number" step="0.01" value={charges.gr} onChange={(e) => setCharges({ ...charges, gr: e.target.value })} placeholder="0.00" className="bg-transparent border-b border-blue-800 text-white text-sm outline-none py-1 placeholder:text-slate-600" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-[#2388ff] uppercase">CROSSING / COLLECTION RS.</label>
-                <input type="number" step="0.01" value={charges.crossing} onChange={(e) => setCharges({ ...charges, crossing: e.target.value })} placeholder="0.00" className="bg-transparent border-b border-blue-800 text-white text-sm outline-none py-1 placeholder:text-slate-600" />
-              </div>
+
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-[#2388ff] uppercase">TRUCK FREIGHT</label>
                 <input type="number" step="0.01" value={charges.truckFreight} onChange={(e) => setCharges({ ...charges, truckFreight: e.target.value })} placeholder="0.00" className="bg-transparent border-b border-blue-800 text-white text-sm outline-none py-1 placeholder:text-slate-600" />

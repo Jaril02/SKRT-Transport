@@ -252,7 +252,7 @@ export default function ShipmentsPage() {
   }, []);
 
   const exportCSV = () => {
-    const headers = ["Consignment No", "Vehicle", "Consignor", "Consignee", "Branch", "Package Type", "Quantity", "Charged Weight", "Payment Mode", "Freight", "Status", "Outgoing Status"];
+    const headers = ["Consignment No", "Vehicle", "Consignor", "Consignee", "Branch", "Package Type", "Quantity", "Charged Weight", "Payment Mode", "Freight", "Status", "Challan", "Outgoing Status"];
     const rows = filteredShipments.map((s: any) => [
       s.consignmentNumber || s.shipmentId || s.id || "",
       s.vehicleNumber || "",
@@ -265,6 +265,7 @@ export default function ShipmentsPage() {
       s.paymentMode || "",
       s.totalFreight ?? "",
       s.status || "Booked",
+      s.challanCreated ? "Created" : "Pending",
       s.outgoingStatus || "Pending",
     ]);
 
@@ -373,6 +374,7 @@ export default function ShipmentsPage() {
                   <TableHead className="text-[10px] w-[7%]">Payment</TableHead>
                   <TableHead className="text-[10px] w-[8%]">Freight</TableHead>
                   <TableHead className="text-[10px] w-[7%]">Status</TableHead>
+                  <TableHead className="text-[10px] w-[8%]">Challan</TableHead>
                   <TableHead className="text-[10px] w-[10%]">Outgoing</TableHead>
                   <TableHead className="text-[10px] w-[7%] text-right">Actions</TableHead>
                 </TableRow>
@@ -394,6 +396,19 @@ export default function ShipmentsPage() {
                       <Badge variant="outline" className={cn("px-1 py-0 whitespace-nowrap text-[10px]", statusColors[shipment.status] || 'bg-muted text-muted-foreground border-border')}>
                         {shipment.status || 'Booked'}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-[10px]">
+                      <button
+                        onClick={() => router.push(`/challan?grNo=${encodeURIComponent(shipment.consignmentNumber || shipment.shipmentId || '')}`)}
+                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase cursor-pointer transition-colors ${
+                          shipment.challanCreated
+                            ? "bg-emerald-900/50 text-emerald-400 hover:bg-emerald-800/60"
+                            : "bg-amber-900/50 text-amber-400 hover:bg-amber-800/60"
+                        }`}
+                        title={shipment.challanCreated ? "Click to view challan" : "Click to create challan"}
+                      >
+                        {shipment.challanCreated ? "Created" : "Pending"}
+                      </button>
                     </TableCell>
                     <TableCell className="text-[10px]">
                       <Select

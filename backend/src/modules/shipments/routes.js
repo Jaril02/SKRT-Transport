@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createShipment, getShipments, getShipmentById, updateShipment, deleteShipment, updateStatus, getNextNumber } = require('./controller');
+const { createShipment, getShipments, getShipmentById, updateShipment, deleteShipment, updateStatus, getNextNumber, getByConsignmentNumber } = require('./controller');
 const { protect } = require('../../middleware/authMiddleware');
 const { requirePermission } = require('../../middleware/permissionMiddleware');
 
@@ -10,6 +10,9 @@ router.route('/')
 
 router.route('/next-number')
   .get(protect, getNextNumber);
+
+router.route('/consignment/:consignmentNo')
+  .get(protect, getByConsignmentNumber);
 
 router.route('/:id')
   .get(protect, getShipmentById)

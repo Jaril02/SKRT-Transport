@@ -38,3 +38,7 @@ Thumbs.db
 .wwebjs_cache/
 
 *.md
+*.docx
+~$*
+generate-comparison-docx.js
+generate-hostinger-docx.js

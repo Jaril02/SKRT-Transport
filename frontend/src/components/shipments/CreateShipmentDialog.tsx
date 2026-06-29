@@ -212,22 +212,8 @@ export function CreateShipmentDialog({
   };
 
   const validate = () => {
-    const nextErrors: Record<string, string> = {};
-    if (!formData.toBranch.trim()) nextErrors.toBranch = 'To Branch is required.';
-    if (!formData.consignorName.trim()) nextErrors.consignorName = 'Consignor Name is required.';
-    if (!formData.consigneeName.trim()) nextErrors.consigneeName = 'Consignee Name is required.';
-    if (!formData.invoiceValue || numericValue(formData.invoiceValue) <= 0) nextErrors.invoiceValue = 'Invoice Value is required.';
-    if (!formData.description.trim()) nextErrors.description = 'Description is required.';
-    if (!formData.quantity || numericValue(formData.quantity) <= 0) nextErrors.quantity = 'Quantity is required.';
-    if (!formData.packageType.trim()) nextErrors.packageType = 'Package Type is required.';
-    if (!formData.privateNumber.trim()) nextErrors.privateNumber = 'Private Number is required.';
-    if (!formData.actualWeight || numericValue(formData.actualWeight) <= 0) nextErrors.actualWeight = 'Actual Weight is required.';
-    if (!formData.chargedWeight || numericValue(formData.chargedWeight) <= 0) nextErrors.chargedWeight = 'Charged Weight is required.';
-    if (!formData.rateType.trim()) nextErrors.rateType = 'Rate Type is required.';
-    if (!formData.rate || numericValue(formData.rate) <= 0) nextErrors.rate = 'Rate is required.';
-    if (!formData.paymentMode.trim()) nextErrors.paymentMode = 'Payment Mode is required.';
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    setErrors({});
+    return true;
   };
 
   const buildShipmentPayload = () => ({
@@ -481,14 +467,13 @@ export function CreateShipmentDialog({
           <form className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-6" onSubmit={(e) => { e.preventDefault(); submitShipment('save'); }}>
             {/* Row 1: To Branch, Vehicle Number, Consignor, Consignee */}
             <div className="col-span-1 space-y-3">
-              <Label className="text-sm font-semibold">To Branch *</Label>
+              <Label className="text-sm font-semibold">To Branch</Label>
               <Input
                 value={formData.toBranch}
                 onChange={(e) => setFormData({ ...formData, toBranch: e.target.value })}
                 placeholder="To Branch"
                 className="h-11 w-full rounded-lg"
               />
-              {renderError('toBranch')}
             </div>
 
             <div className="col-span-1 space-y-3">
@@ -533,14 +518,13 @@ export function CreateShipmentDialog({
             </div>
 
             <div className="col-span-1 space-y-3">
-              <Label className="text-sm font-semibold">Consignor Name *</Label>
+              <Label className="text-sm font-semibold">Consignor Name</Label>
               <Input
                 value={formData.consignorName}
                 onChange={(e) => setFormData({ ...formData, consignorName: e.target.value })}
                 placeholder="Consignor Name"
                 className="h-11 w-full rounded-lg"
               />
-              {renderError('consignorName')}
             </div>
 
             <div className="col-span-1 space-y-3">
@@ -554,14 +538,13 @@ export function CreateShipmentDialog({
             </div>
 
             <div className="col-span-1 space-y-3">
-              <Label className="text-sm font-semibold">Consignee Name *</Label>
+              <Label className="text-sm font-semibold">Consignee Name</Label>
               <Input
                 value={formData.consigneeName}
                 onChange={(e) => setFormData({ ...formData, consigneeName: e.target.value })}
                 placeholder="Consignee Name"
                 className="h-11 w-full rounded-lg"
               />
-              {renderError('consigneeName')}
             </div>
 
             <div className="col-span-1 space-y-3">
@@ -603,7 +586,7 @@ export function CreateShipmentDialog({
               />
             </div>
             <div className="col-span-1 space-y-3">
-              <Label className="text-sm font-semibold">Invoice Value *</Label>
+              <Label className="text-sm font-semibold">Invoice Value</Label>
               <Input
                 type="number"
                 value={formData.invoiceValue}
@@ -611,22 +594,20 @@ export function CreateShipmentDialog({
                 placeholder="Invoice Value"
                 className="h-11 w-full rounded-lg"
               />
-              {renderError('invoiceValue')}
             </div>
 
             {/* Row 3: Description, Quantity, Package Type, Private Number */}
             <div className="col-span-1 md:col-span-2 space-y-3">
-              <Label className="text-sm font-semibold">Description *</Label>
+              <Label className="text-sm font-semibold">Description</Label>
               <Input
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Enter shipment description"
                 className="h-11 w-full rounded-lg"
               />
-              {renderError('description')}
             </div>
             <div className="col-span-1 space-y-3">
-              <Label className="text-sm font-semibold">Quantity *</Label>
+              <Label className="text-sm font-semibold">Quantity</Label>
               <Input
                 type="number"
                 value={formData.quantity}
@@ -634,10 +615,9 @@ export function CreateShipmentDialog({
                 placeholder="Quantity"
                 className="h-11 w-full rounded-lg"
               />
-              {renderError('quantity')}
             </div>
             <div className="col-span-1 space-y-3">
-              <Label className="text-sm font-semibold">Package Type *</Label>
+              <Label className="text-sm font-semibold">Package Type</Label>
               <Select
                 value={formData.packageType}
                 onValueChange={(value) => setFormData({ ...formData, packageType: value })}
@@ -654,22 +634,20 @@ export function CreateShipmentDialog({
                   <SelectItem value="Loose">Loose</SelectItem>
                 </SelectContent>
               </Select>
-              {renderError('packageType')}
             </div>
             <div className="col-span-1 space-y-3">
-              <Label className="text-sm font-semibold">Private Number *</Label>
+              <Label className="text-sm font-semibold">Private Number</Label>
               <Input
                 value={formData.privateNumber}
                 onChange={(e) => setFormData({ ...formData, privateNumber: e.target.value })}
                 placeholder="Private Number"
                 className="h-11 w-full rounded-lg"
               />
-              {renderError('privateNumber')}
             </div>
 
             {/* Row 4: Actual Weight, Charged Weight, Rate Type, Rate */}
             <div className="col-span-1 space-y-3">
-              <Label className="text-sm font-semibold">Actual Weight *</Label>
+              <Label className="text-sm font-semibold">Actual Weight</Label>
               <Input
                 type="number"
                 value={formData.actualWeight}
@@ -677,10 +655,9 @@ export function CreateShipmentDialog({
                 placeholder="Actual Weight"
                 className="h-11 w-full rounded-lg"
               />
-              {renderError('actualWeight')}
             </div>
             <div className="col-span-1 space-y-3">
-              <Label className="text-sm font-semibold">Charged Weight *</Label>
+              <Label className="text-sm font-semibold">Charged Weight</Label>
               <Input
                 type="number"
                 value={formData.chargedWeight}
@@ -688,10 +665,9 @@ export function CreateShipmentDialog({
                 placeholder="Charged Weight"
                 className="h-11 w-full rounded-lg"
               />
-              {renderError('chargedWeight')}
             </div>
             <div className="col-span-1 space-y-3">
-              <Label className="text-sm font-semibold">Rate Type *</Label>
+              <Label className="text-sm font-semibold">Rate Type</Label>
               <Select
                 value={formData.rateType}
                 onValueChange={(value) => setFormData({ ...formData, rateType: value })}
@@ -705,10 +681,9 @@ export function CreateShipmentDialog({
                   <SelectItem value="Fixed">Fixed</SelectItem>
                 </SelectContent>
               </Select>
-              {renderError('rateType')}
             </div>
             <div className="col-span-1 space-y-3">
-              <Label className="text-sm font-semibold">Rate *</Label>
+              <Label className="text-sm font-semibold">Rate</Label>
               <Input
                 type="number"
                 value={formData.rate}
@@ -716,12 +691,11 @@ export function CreateShipmentDialog({
                 placeholder="Rate"
                 className="h-11 w-full rounded-lg"
               />
-              {renderError('rate')}
             </div>
 
             {/* Row 5: Payment Mode, Hamali, Stationary Charge, Miscellaneous Charge */}
             <div className="col-span-1 space-y-3">
-              <Label className="text-sm font-semibold">Payment Mode *</Label>
+              <Label className="text-sm font-semibold">Payment Mode</Label>
               <Select
                 value={formData.paymentMode}
                 onValueChange={(value) => setFormData({ ...formData, paymentMode: value })}
@@ -735,7 +709,6 @@ export function CreateShipmentDialog({
                   <SelectItem value="TBB">TBB</SelectItem>
                 </SelectContent>
               </Select>
-              {renderError('paymentMode')}
             </div>
             <div className="col-span-1 space-y-3">
               <Label className="text-sm font-semibold">Hamali</Label>

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import api from "@/lib/api";
 import { useHeader } from "@/context/HeaderContext";
 import { fetchTemplate, fillTemplate } from "@/lib/template-utils";
+import { handleTableCellKeyDown } from "@/lib/tableNavigation";
 
 type EntryRow = {
   id?: number | string;
@@ -766,37 +767,37 @@ export default function EntryRegisterPage() {
                       className="bg-[#2388ff]/30 transition-colors group"
                     >
                       <td className="border border-slate-700 p-0 w-[4%]">
-                        <input type="text" value={row.sno} onChange={(e) => updateRow(idx, 'sno', e.target.value)} className="w-full h-full p-1.5 bg-transparent border-0 text-center font-mono text-slate-400 outline-none focus:bg-[#2388ff]/10" />
+                        <input type="text" value={row.sno} onChange={(e) => updateRow(idx, 'sno', e.target.value)} data-row={idx} data-col={0} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 0)} className="w-full h-full p-1.5 bg-transparent border-0 text-center font-mono text-slate-400 outline-none focus:bg-[#2388ff]/10" />
                       </td>
                       <td className="border border-slate-700 p-0">
-                        <input type="text" value={row.from} onChange={(e) => updateRow(idx, 'from', e.target.value)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
+                        <input type="text" value={row.from} onChange={(e) => updateRow(idx, 'from', e.target.value)} data-row={idx} data-col={1} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 1)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
                       </td>
                       <td className="border border-slate-700 p-0">
-                        <input type="text" value={row.to} onChange={(e) => updateRow(idx, 'to', e.target.value)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
+                        <input type="text" value={row.to} onChange={(e) => updateRow(idx, 'to', e.target.value)} data-row={idx} data-col={2} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 2)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
                       </td>
                       <td className="border border-slate-700 p-0">
-                        <input type="text" value={row.grNo} onChange={(e) => updateRow(idx, 'grNo', e.target.value)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
+                        <input type="text" value={row.grNo} onChange={(e) => updateRow(idx, 'grNo', e.target.value)} data-row={idx} data-col={3} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 3)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
                       </td>
                       <td className="border border-slate-700 p-0">
-                        <input type="text" value={row.consignor} onChange={(e) => updateRow(idx, 'consignor', e.target.value)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
+                        <input type="text" value={row.consignor} onChange={(e) => updateRow(idx, 'consignor', e.target.value)} data-row={idx} data-col={4} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 4)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
                       </td>
                       <td className="border border-slate-700 p-0">
-                        <input type="text" value={row.consignee} onChange={(e) => updateRow(idx, 'consignee', e.target.value)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
+                        <input type="text" value={row.consignee} onChange={(e) => updateRow(idx, 'consignee', e.target.value)} data-row={idx} data-col={5} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 5)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
                       </td>
                       <td className="border border-slate-700 p-0">
-                        <input type="text" value={row.noOfPackages} onChange={(e) => updateRow(idx, 'noOfPackages', e.target.value)} className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none focus:bg-[#2388ff]/10" />
+                        <input type="text" value={row.noOfPackages} onChange={(e) => updateRow(idx, 'noOfPackages', e.target.value)} data-row={idx} data-col={6} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 6)} className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none focus:bg-[#2388ff]/10" />
                       </td>
                       <td className="border border-slate-700 p-0">
-                        <input type="text" value={row.contents} onChange={(e) => updateRow(idx, 'contents', e.target.value)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
+                        <input type="text" value={row.contents} onChange={(e) => updateRow(idx, 'contents', e.target.value)} data-row={idx} data-col={7} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 7)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
                       </td>
                       <td className="border border-slate-700 p-0">
-                        <input type="text" value={row.freight} onChange={(e) => updateRow(idx, 'freight', e.target.value)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
+                        <input type="text" value={row.freight} onChange={(e) => updateRow(idx, 'freight', e.target.value)} data-row={idx} data-col={8} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 8)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
                       </td>
                       <td className="border border-slate-700 p-0">
-                        <input type="text" value={row.deliveryReceiptNo} onChange={(e) => updateRow(idx, 'deliveryReceiptNo', e.target.value)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
+                        <input type="text" value={row.deliveryReceiptNo} onChange={(e) => updateRow(idx, 'deliveryReceiptNo', e.target.value)} data-row={idx} data-col={9} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 9)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
                       </td>
                       <td className="border border-slate-700 p-0 relative">
-                        <input type="text" value={row.dateOfDelivery} onChange={(e) => updateRow(idx, 'dateOfDelivery', e.target.value)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
+                        <input type="text" value={row.dateOfDelivery} onChange={(e) => updateRow(idx, 'dateOfDelivery', e.target.value)} data-row={idx} data-col={10} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 10)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
                         <button
                           onClick={() => deleteRow(idx)}
                           className="del-btn print-hide absolute right-1 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 border border-slate-700 rounded p-[2px]"

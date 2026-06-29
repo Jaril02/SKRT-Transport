@@ -29,7 +29,7 @@ export function AddExpenseDialog({ onExpenseAdded }: { onExpenseAdded: () => voi
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     category: "Fuel",
-    amount: "",
+    amount: 0,
     vehicle: "",
     description: "",
     date: new Date().toISOString().split('T')[0],
@@ -37,10 +37,6 @@ export function AddExpenseDialog({ onExpenseAdded }: { onExpenseAdded: () => voi
   });
 
   const [customCategory, setCustomCategory] = useState("");
-
-  useEffect(() => {
-    setCustomCategory("");
-  }, [formData.category]);
 
   useEffect(() => {
     const fetchVehicles = async () => {
@@ -61,20 +57,14 @@ export function AddExpenseDialog({ onExpenseAdded }: { onExpenseAdded: () => voi
     setLoading(true);
 
     try {
-      const description = formData.category === "Other" && customCategory.trim()
-        ? `[${customCategory.trim()}] ${formData.description}`
-        : formData.description;
-      const payload: Record<string, any> = {
-        ...formData,
-        description,
-        amount: Number(formData.amount) || 0
-      };
+      const cat = formData.category === "Other" && customCategory.trim() ? customCategory.trim() : formData.category;
+      const payload: Record<string, any> = { ...formData, category: cat };
       if (!formData.vehicle || formData.vehicle === "none") delete payload.vehicle;
       await api.post("/expenses", payload);
       toast.success("Expense recorded successfully!");
       setOpen(false);
       onExpenseAdded();
-      setFormData({ category: "Fuel", amount: "", vehicle: "", description: "", date: new Date().toISOString().split('T')[0], status: "paid" });
+      setFormData({ category: "Fuel", amount: 0, vehicle: "", description: "", date: new Date().toISOString().split('T')[0], status: "paid" });
       setCustomCategory("");
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to add expense");
@@ -128,15 +118,10 @@ export function AddExpenseDialog({ onExpenseAdded }: { onExpenseAdded: () => voi
             <Label htmlFor="amount">Amount (₹)</Label>
             <Input 
               id="amount" 
-              type="text"
-              inputMode="numeric"
+              type="number"
               required
-              placeholder="0"
               value={formData.amount} 
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val === "" || /^\d+$/.test(val)) setFormData({...formData, amount: val});
-              }} 
+              onChange={(e) => setFormData({...formData, amount: Number(e.target.value)})} 
             />
           </div>
 

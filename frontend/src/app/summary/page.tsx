@@ -550,7 +550,7 @@ export default function SummaryPage() {
                     {/* ── Extra fields separator ── */}
                     <div className="flex items-center gap-2 pt-2 pb-1">
                       <div className="flex-1 h-px bg-blue-900/30" />
-                      <span className="text-[9px] font-bold uppercase tracking-[3px] text-slate-500">Adjust</span>
+                      <span className="text-[9px] font-bold uppercase tracking-[3px] text-slate-500">Adjustments</span>
                       <div className="flex-1 h-px bg-blue-900/30" />
                     </div>
 
