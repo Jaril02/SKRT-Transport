@@ -104,7 +104,7 @@ function buildReceiptHtml(shipment: any): string {
       <table>
         <tr>
           <td colspan="6">
-            <div class="company">Sant Kanwar Ram Transport Corporation</div>
+            <div class="company">Sant Kanwar Ram Transport Corporation(BHL.)</div>
             <div class="sub">
               123,124 Transport Nagar, Bhilwara - 311001 (Raj.)<br>
               Mob: 96809-92567 / 86196-06627<br>
@@ -115,10 +115,10 @@ function buildReceiptHtml(shipment: any): string {
             <table style="width:100%;border-collapse:collapse;height:100%;">
               <tr>
                 <td class="bold">Date: ${fmtDate(shipment.bookedAt)}</td>
-                <td class="bold">GR No: ${shipment.consignmentNumber || '—'}</td>
+                <td class="bold">SK No: ${shipment.consignmentNumber || '—'}</td>
               </tr>
               <tr>
-                <td class="bold">From: BHILWARA (BLW)</td>
+                <td class="bold">From: BHILWARA</td>
                 <td class="bold">To: ${(shipment.toBranch || '—').toUpperCase()}</td>
               </tr>
             </table>

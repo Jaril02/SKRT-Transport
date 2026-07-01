@@ -115,10 +115,14 @@ exports.getNextNumber = async (req, res) => {
 // @access  Private
 exports.getShipments = async (req, res) => {
   try {
-    const { status, search, limit } = req.query;
+    const { status, search, limit, challanCreated } = req.query;
     const filter = {};
 
     if (status) filter.status = status;
+    if (challanCreated !== undefined) {
+      if (challanCreated === 'true') filter.challanCreated = true;
+      else if (challanCreated === 'false') filter.challanCreated = false;
+    }
     if (search) {
       const regex = new RegExp(search, 'i');
       filter.$or = [

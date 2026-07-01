@@ -34,11 +34,14 @@ Thumbs.db
 # Vercel
 .vercel/
 
+#claude
+.claude/
+
 .wwebjs_auth/
 .wwebjs_cache/
 
 *.md
 *.docx
 ~$*
-generate-comparison-docx.js
-generate-hostinger-docx.js
+generate-*.js
+dump/
