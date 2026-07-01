@@ -39,6 +39,8 @@ Thumbs.db
 
 .wwebjs_auth/
 .wwebjs_cache/
+.baileys_auth/
+
 
 *.md
 *.docx
@@ -47,3 +49,4 @@ generate-*.js
 dump/
 
 backend/seed.js
+

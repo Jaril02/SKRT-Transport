@@ -18,12 +18,14 @@ interface WhatsAppQRDialogProps {
 export function WhatsAppQRDialog({ open, onOpenChange }: WhatsAppQRDialogProps) {
   const [status, setStatus] = useState<"loading" | "connected" | "qr" | "error">("loading");
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
       const { data } = await api.get("/whatsapp/status");
       if (data.success) {
+        setStatusMessage(data.data.message || null);
         if (data.data.connected) {
           setStatus("connected");
           setQrCode(null);
@@ -93,8 +95,9 @@ export function WhatsAppQRDialog({ open, onOpenChange }: WhatsAppQRDialogProps) 
           {status === "loading" && (
             <>
               <Loader2 className="w-12 h-12 text-[#2388ff] animate-spin" />
-              <p className="text-slate-400 text-sm">Starting WhatsApp client...</p>
-              <p className="text-slate-600 text-xs">This may take a few seconds</p>
+              <p className="text-slate-400 text-sm">{statusMessage || 'Starting WhatsApp client...'}</p>
+              {!statusMessage && <p className="text-slate-600 text-xs">This may take a few seconds</p>}
+              {statusMessage && <p className="text-amber-400 text-xs animate-pulse">{statusMessage}</p>}
             </>
           )}
 
