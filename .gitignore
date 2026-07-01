@@ -45,3 +45,5 @@ Thumbs.db
 ~$*
 generate-*.js
 dump/
+
+backend/seed.js
