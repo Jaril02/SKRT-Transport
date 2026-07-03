@@ -10,7 +10,8 @@ const {
   getUserById,
   updateUser,
   deleteUser,
-  adminResetPassword
+  adminResetPassword,
+  getMyPermissions
 } = require('./controller');
 const { protect, authorize } = require('../../middleware/authMiddleware');
 
@@ -21,6 +22,7 @@ router.post('/login', login);
 router.get('/profile', protect, getProfile);
 router.put('/profile', protect, updateProfile);
 router.post('/change-password', protect, changePassword);
+router.get('/my-permissions', protect, getMyPermissions);
 
 // ── Admin-only: User Management ──────────────────────────
 router.post('/register', protect, authorize('admin', 'manager'), register);

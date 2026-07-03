@@ -35,9 +35,29 @@ const menuItems = [
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
+const hrefToModule: Record<string, string> = {
+  "/dashboard": "dashboard",
+  "/inventory": "inventory",
+  "/shipments": "shipments",
+  "/tracking": "tracking",
+  "/fleet": "vehicles",
+  "/drivers": "drivers",
+  "/clients": "clients",
+  "/expenses": "expenses",
+  "/invoices": "invoices",
+  "/analytics": "analytics",
+  "/settings": "settings",
+};
+
 export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { can, logout } = useAuth();
+
+  const visibleItems = menuItems.filter(item => {
+    const module = hrefToModule[item.href];
+    if (!module) return true;
+    return can(module, 'view');
+  });
 
   return (
     <aside
@@ -59,7 +79,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
       </div>
 
       <nav className="flex-1 px-4 space-y-2 mt-4">
-        {menuItems.map((item) => {
+        {visibleItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
 

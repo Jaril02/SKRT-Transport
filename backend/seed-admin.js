@@ -56,6 +56,16 @@ async function seedAdmin() {
       console.log(`ℹ️  Manager already exists: ${existingManager.email}`);
     }
 
+    // Seed default permissions for manager role
+    const RolePermission = require('./src/modules/settings/permissionModel');
+    const existingPerms = await RolePermission.findOne({ role: 'manager' });
+    if (!existingPerms) {
+      await RolePermission.create({ role: 'manager', permissions: {} });
+      console.log('✅ Default manager permissions seeded');
+    } else {
+      console.log('ℹ️  Manager permissions already exist');
+    }
+
     await mongoose.connection.close();
     console.log('\n🎉 Seed complete!');
     console.log('   Admin  : admin@skrt.com    / Admin@1234');

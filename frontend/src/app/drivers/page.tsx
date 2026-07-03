@@ -10,8 +10,10 @@ import { Input } from "@/components/ui/input";
 
 import api from "@/lib/api";
 import { AddDriverDialog } from "@/components/drivers/AddDriverDialog";
+import { useAuth } from "@/context/AuthContext";
 
 export default function DriversPage() {
+  const { can } = useAuth();
   const [driverList, setDriverList] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -57,7 +59,7 @@ export default function DriversPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <AddDriverDialog onDriverAdded={fetchDrivers} />
+            {can('drivers', 'create') && <AddDriverDialog onDriverAdded={fetchDrivers} />}
           </div>
         </div>
 

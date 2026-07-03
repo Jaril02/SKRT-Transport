@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 
 import api from "@/lib/api";
 import { AddClientDialog } from "@/components/clients/AddClientDialog";
+import { useAuth } from "@/context/AuthContext";
 
 export default function ClientsPage() {
+  const { can } = useAuth();
   const [clientList, setClientList] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -57,7 +59,7 @@ export default function ClientsPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <AddClientDialog onClientAdded={fetchClients} />
+            {can('clients', 'create') && <AddClientDialog onClientAdded={fetchClients} />}
           </div>
         </div>
 

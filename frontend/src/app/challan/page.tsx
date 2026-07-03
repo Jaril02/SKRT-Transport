@@ -172,7 +172,7 @@ export default function ChallanPage() {
       grNo: shipment.consignmentNumber || '',
       pkg: String(shipment.quantity ?? ''),
       dest: shipment.toBranch || '',
-      content: shipment.description || '',
+      content: '',
       consignor: shipment.consignor?.name || '',
       consignee: shipment.consignee?.name || '',
       total: String(shipment.totalPayable ?? shipment.totalFreight ?? ''),

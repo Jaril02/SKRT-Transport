@@ -408,7 +408,7 @@ export default function SummaryPage() {
                   {/* ── Company Header ── */}
                   <div className="text-center mb-1">
                     <div className="text-[12px] font-black uppercase tracking-wide text-[#2388ff] leading-tight">
-                      Sant Kanwar Ram Transport Corp. (BHL.)  <span className="text-slate-400">(BHL.)</span>
+                      Sant Kanwar Ram Transport Corp.(BHL.)
                     </div>
                     <div className="text-[10px] text-slate-500 mt-0.5 tracking-wider">
                       Bhilwara – 311001 (Raj.)

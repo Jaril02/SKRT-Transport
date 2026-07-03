@@ -52,7 +52,7 @@ export function AddClientDialog({ onClientAdded }: { onClientAdded: () => void }
           <Plus className="w-4 h-4 mr-2" /> Add Client
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto overflow-x-hidden w-full max-w-[500px] box-border">
+      <DialogContent className="max-h-[90vh] overflow-y-auto overflow-x-hidden w-full max-w-[500px] box-border bg-background border border-border shadow-2xl">
         <DialogHeader>
           <DialogTitle>Add New Client</DialogTitle>
         </DialogHeader>

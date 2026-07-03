@@ -50,6 +50,7 @@ import { ViewContactDialog } from "@/components/shipments/ViewContactDialog";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { useHeader } from "@/context/HeaderContext";
+import { useAuth } from "@/context/AuthContext";
 import { generateAndSendPDF } from "@/lib/whatsapp";
 import {
   Select,
@@ -217,6 +218,7 @@ function buildReceiptHtml(shipment: any): string {
 export default function ShipmentsPage() {
   const router = useRouter();
   const { searchQuery } = useHeader();
+  const { can } = useAuth();
   const [shipmentList, setShipmentList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -342,7 +344,7 @@ export default function ShipmentsPage() {
             <Button variant="outline" size="sm" onClick={exportCSV}>
               <Download className="h-4 w-4 mr-2" /> Download
             </Button>
-            <CreateShipmentDialog onShipmentCreated={fetchShipments} />
+            {can('shipments', 'create') && <CreateShipmentDialog onShipmentCreated={fetchShipments} />}
           </div>
         </div>
 
@@ -451,11 +453,13 @@ export default function ShipmentsPage() {
                               <Eye className="h-4 w-4 mr-2 text-primary" /> View Shipment
                             </DropdownMenuItem>
 
+                            {can('shipments', 'edit') && (
                             <DropdownMenuItem
                               onClick={() => { setSelectedShipment(shipment); setEditOpen(true); }}
                             >
                               <Edit className="h-4 w-4 mr-2 text-yellow-500" /> Edit Shipment
                             </DropdownMenuItem>
+                            )}
 
                             <DropdownMenuItem
                               onClick={() => handlePrintReceipt(shipment)}

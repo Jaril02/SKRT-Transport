@@ -19,16 +19,16 @@ const roleColors: Record<string, string> = {
 };
 
 const MODULES = [
-  'shipments', 'inventory', 'vehicles', 'drivers',
-  'clients', 'invoices', 'contacts', 'expenses',
-  'users', 'settings',
+  'dashboard', 'shipments', 'inventory', 'vehicles', 'tracking',
+  'drivers', 'clients', 'invoices', 'contacts', 'expenses',
+  'analytics', 'users', 'settings',
 ] as const;
 
 type Module = typeof MODULES[number];
-type Permissions = Record<Module, { create: boolean; edit: boolean; delete: boolean }>;
+type Permissions = Record<Module, { view: boolean; create: boolean; edit: boolean; delete: boolean }>;
 
 const defaultPermissions = (all: boolean): Permissions =>
-  Object.fromEntries(MODULES.map(m => [m, { create: all, edit: all, delete: all }])) as Permissions;
+  Object.fromEntries(MODULES.map(m => [m, { view: all, create: all, edit: all, delete: all }])) as Permissions;
 
 export default function SettingsPage() {
   const { user: authUser, isLoading: authLoading } = useAuth();
@@ -207,7 +207,7 @@ export default function SettingsPage() {
     }
   };
 
-  const setModulePerm = (mod: Module, action: 'create' | 'edit' | 'delete', val: boolean) => {
+  const setModulePerm = (mod: Module, action: 'view' | 'create' | 'edit' | 'delete', val: boolean) => {
     setPerms(prev => {
       if (!prev) return prev;
       return {
@@ -222,7 +222,7 @@ export default function SettingsPage() {
       if (!prev) return prev;
       const next = { ...prev };
       for (const m of MODULES) {
-        next[m] = { create: true, edit: true, delete: true };
+        next[m] = { view: true, create: true, edit: true, delete: true };
       }
       return next;
     });
@@ -233,7 +233,7 @@ export default function SettingsPage() {
       if (!prev) return prev;
       const next = { ...prev };
       for (const m of MODULES) {
-        next[m] = { create: false, edit: false, delete: false };
+        next[m] = { view: false, create: false, edit: false, delete: false };
       }
       return next;
     });
@@ -413,6 +413,7 @@ export default function SettingsPage() {
                           <thead>
                             <tr className="bg-zinc-900/60 border-b border-zinc-800">
                               <th className="text-left text-zinc-400 font-bold px-4 py-3 text-xs uppercase tracking-wider">Module</th>
+                              <th className="text-center text-zinc-400 font-bold px-2 py-3 text-xs uppercase tracking-wider border-l border-zinc-800">View</th>
                               <th className="text-center text-zinc-400 font-bold px-2 py-3 text-xs uppercase tracking-wider border-l border-zinc-800">Create</th>
                               <th className="text-center text-zinc-400 font-bold px-2 py-3 text-xs uppercase tracking-wider border-l border-zinc-800">Edit</th>
                               <th className="text-center text-zinc-400 font-bold px-2 py-3 text-xs uppercase tracking-wider border-l border-zinc-800">Delete</th>
@@ -420,15 +421,16 @@ export default function SettingsPage() {
                           </thead>
                           <tbody>
                             {MODULES.map((mod) => {
-                              const p = perms[mod] || { create: false, edit: false, delete: false };
+                              const p = perms[mod] || { view: true, create: false, edit: false, delete: false };
+                              const viewChecked = p.view === undefined ? true : p.view;
                               return (
                                 <tr key={mod} className="border-b border-zinc-800/60 hover:bg-zinc-900/40 transition-colors">
                                   <td className="px-4 py-3 text-zinc-100 font-semibold text-sm capitalize">{mod}</td>
-                                  {(['create', 'edit', 'delete'] as const).map((action) => (
+                                  {(['view', 'create', 'edit', 'delete'] as const).map((action) => (
                                     <td key={action} className="px-2 py-3 text-center border-l border-zinc-800/40">
                                       <input
                                         type="checkbox"
-                                        checked={p[action]}
+                                        checked={action === 'view' ? viewChecked : p[action]}
                                         onChange={(e) => setModulePerm(mod, action, e.target.checked)}
                                         className="w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-primary focus:ring-primary cursor-pointer accent-[#2388ff]"
                                       />

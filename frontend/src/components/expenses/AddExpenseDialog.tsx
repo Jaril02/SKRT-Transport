@@ -80,7 +80,7 @@ export function AddExpenseDialog({ onExpenseAdded }: { onExpenseAdded: () => voi
           <Plus className="w-4 h-4 mr-2" /> Add Expense
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto overflow-x-hidden w-full max-w-[425px] box-border">
+      <DialogContent className="max-h-[90vh] overflow-y-auto overflow-x-hidden w-full max-w-[500px] box-border bg-background border border-border shadow-2xl">
         <DialogHeader>
           <DialogTitle>Record Expense</DialogTitle>
         </DialogHeader>

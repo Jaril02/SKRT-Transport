@@ -223,6 +223,22 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
+// @desc    Get current user's permissions
+// @route   GET /api/auth/my-permissions
+// @access  Private
+exports.getMyPermissions = async (req, res) => {
+  try {
+    if (req.user.role === 'admin') {
+      return sendResponse(res, 200, true, 'Permissions fetched', { all: true });
+    }
+    const RolePermission = require('../settings/permissionModel');
+    const rp = await RolePermission.findOne({ role: req.user.role });
+    return sendResponse(res, 200, true, 'Permissions fetched', rp?.permissions || {});
+  } catch (error) {
+    return sendResponse(res, 500, false, error.message);
+  }
+};
+
 // @desc    Admin reset user password
 // @route   POST /api/auth/users/:id/reset-password
 // @access  Admin

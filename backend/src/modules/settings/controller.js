@@ -35,9 +35,10 @@ exports.updateCompanySettings = async (req, res) => {
 
 exports.getPermissions = async (req, res) => {
   try {
-    let rp = await RolePermission.findOne({ role: 'manager' });
+    const role = req.query.role || 'manager';
+    let rp = await RolePermission.findOne({ role });
     if (!rp) {
-      rp = await RolePermission.create({ role: 'manager', permissions: {} });
+      rp = await RolePermission.create({ role, permissions: {} });
     }
     return sendResponse(res, 200, true, 'Permissions fetched', rp);
   } catch (error) {
@@ -47,9 +48,10 @@ exports.getPermissions = async (req, res) => {
 
 exports.updatePermissions = async (req, res) => {
   try {
-    let rp = await RolePermission.findOne({ role: 'manager' });
+    const role = req.query.role || 'manager';
+    let rp = await RolePermission.findOne({ role });
     if (!rp) {
-      rp = await RolePermission.create({ role: 'manager', permissions: req.body });
+      rp = await RolePermission.create({ role, permissions: req.body });
     } else {
       rp.permissions = req.body;
       await rp.save();

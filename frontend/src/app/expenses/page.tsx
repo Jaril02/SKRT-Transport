@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { AddExpenseDialog } from "@/components/expenses/AddExpenseDialog";
 
 const CATEGORIES = ["Fuel", "Maintenance", "Toll", "Driver Payment", "Other"];
@@ -96,6 +97,7 @@ function AnimatedNumber({ value }: { value: number }) {
 }
 
 export default function ExpensesPage() {
+  const { can } = useAuth();
   const [expenseList, setExpenseList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState<any[]>([]);
@@ -225,7 +227,7 @@ export default function ExpensesPage() {
                 <span className="absolute -top-1.5 -right-1.5 w-2 h-2 rounded-full bg-primary animate-pulse" />
               )}
             </Button>
-            <AddExpenseDialog onExpenseAdded={fetchExpenses} />
+            {can('expenses', 'create') && <AddExpenseDialog onExpenseAdded={fetchExpenses} />}
           </div>
         </motion.div>
 
