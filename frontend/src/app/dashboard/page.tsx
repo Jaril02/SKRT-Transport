@@ -161,7 +161,7 @@ export default function DashboardPage() {
     <DashboardLayout>
       <div className="space-y-8">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Executive Dashboard</h2>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Executive Dashboard</h2>
           <p className="text-muted-foreground">
             Live data from MongoDB · Last updated {new Date().toLocaleTimeString()}
           </p>
@@ -343,7 +343,34 @@ export default function DashboardPage() {
               <CardTitle>Recent Shipments</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
+              {/* Mobile card view */}
+              <div className="md:hidden space-y-2.5">
+                {stats.recentShipments.map((s: any) => (
+                  <div key={s._id} className="rounded-lg border border-border/40 bg-secondary/20 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono text-xs font-medium">{s.consignmentNumber}</span>
+                      <span
+                        className="px-2 py-0.5 rounded-full text-xs font-medium"
+                        style={{
+                          backgroundColor: `${STATUS_COLORS[s.status] ?? "#94a3b8"}20`,
+                          color: STATUS_COLORS[s.status] ?? "#94a3b8"
+                        }}
+                      >
+                        {s.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                      <span className="truncate">{s.consignor?.name ?? "—"}</span>
+                      <span className="text-muted-foreground">&rarr;</span>
+                      <span className="truncate">{s.consignee?.name ?? "—"}</span>
+                    </div>
+                    <div className="text-right text-sm font-semibold">₹{(s.totalPayable ?? 0).toLocaleString()}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop table view */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border/50">

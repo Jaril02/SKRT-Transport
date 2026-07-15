@@ -445,7 +445,7 @@ export function CreateShipmentDialog({
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="w-[90vw] max-w-[1400px] min-w-[1000px] h-[85vh] p-0 overflow-hidden bg-background border border-border shadow-2xl rounded-2xl flex flex-col">
+      <DialogContent className="w-[90vw] max-w-[1400px] lg:min-w-[1000px] h-[85vh] p-0 overflow-hidden bg-background border border-border shadow-2xl rounded-2xl flex flex-col">
         {/* Fixed Header */}
         <div className="flex-shrink-0 flex items-start justify-between gap-3 border-b border-border/50 px-8 py-6">
           <div>
@@ -780,7 +780,7 @@ export function CreateShipmentDialog({
         </div>
 
         {/* Fixed Footer */}
-        <div className="flex-shrink-0 flex items-center justify-end gap-4 border-t border-border/50 px-8 py-5 bg-background">
+        <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4 border-t border-border/50 px-8 py-5 bg-background">
           <Button variant="ghost" onClick={() => setOpen(false)} className="h-11 px-6 rounded-lg font-medium text-muted-foreground hover:bg-accent">
             Cancel
           </Button>

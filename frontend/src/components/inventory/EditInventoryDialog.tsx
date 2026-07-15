@@ -294,7 +294,7 @@ export function EditInventoryDialog({
         </div>
 
         {/* Fixed Footer */}
-        <div className="flex-shrink-0 px-8 py-5 border-t border-border/50 bg-secondary/5 flex justify-end gap-3">
+        <div className="flex-shrink-0 px-8 py-5 border-t border-border/50 bg-secondary/5 flex flex-col sm:flex-row sm:justify-end gap-3">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="h-11 px-6 rounded-lg font-medium text-muted-foreground hover:bg-accent">
             Cancel
           </Button>

@@ -275,7 +275,7 @@ export function ViewEditEntryDialog({
           )}
         </div>
 
-        <div className="flex-shrink-0 flex items-center justify-end gap-4 border-t border-slate-700/50 px-8 py-5">
+        <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4 border-t border-slate-700/50 px-8 py-5">
           {!isEditing ? (
             <>
               <Button

@@ -507,7 +507,37 @@ export default function FleetPage() {
     if (flatRows.length === 0) return renderNoData(false);
     if (filtered.length === 0) return renderNoData(true);
     return (
-      <div className="overflow-x-auto border border-slate-700 rounded-lg">
+      <>
+      {/* Mobile card view */}
+      <div className="md:hidden space-y-2.5">
+        {filtered.map((row: any, i: number) => (
+          <div
+            key={i}
+            id={`row-challan-${row.challanNo}`}
+            onClick={() => handleRowClick("challan", row._regId, row._entryIdx)}
+            className={cn("rounded-lg border p-3 transition-colors cursor-pointer", isChallanMatch(row, searchQuery) ? "border-[#2388ff]/60 bg-[#2388ff]/10" : "border-slate-700 bg-slate-900/40 active:bg-slate-800/50")}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-white">Challan {row.challanNo || "—"}</span>
+              <span className="text-xs text-slate-400">{row._regDate || "—"}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+              <div><span className="text-slate-500">Vehicle: </span><span className="text-white">{row.vehicleNo || "—"}</span></div>
+              <div><span className="text-slate-500">Driver: </span><span className="text-white">{row.driverName || "—"}</span></div>
+              <div><span className="text-slate-500">G.R. No: </span><span className="text-white">{row.grNo || "—"}</span></div>
+              <div><span className="text-slate-500">Pkg: </span><span className="text-white">{row.pkg || "—"}</span></div>
+              <div className="truncate"><span className="text-slate-500">Dest: </span><span className="text-white">{row.dest || "—"}</span></div>
+              <div className="truncate"><span className="text-slate-500">Content: </span><span className="text-white">{row.content || "—"}</span></div>
+              <div className="truncate"><span className="text-slate-500">Consignor: </span><span className="text-white">{row.consignor || "—"}</span></div>
+              <div className="truncate"><span className="text-slate-500">Consignee: </span><span className="text-white">{row.consignee || "—"}</span></div>
+              <div><span className="text-slate-500">Wt: </span><span className="text-white">{row.wt || "—"}</span></div>
+              <div><span className="text-slate-500">Total: </span><span className="text-white font-bold">{row.total || "—"}</span></div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Desktop table view */}
+      <div className="hidden md:block overflow-x-auto border border-slate-700 rounded-lg">
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-slate-900/80">
@@ -553,6 +583,7 @@ export default function FleetPage() {
           </tbody>
         </table>
       </div>
+      </>
     );
   };
 
@@ -563,7 +594,36 @@ export default function FleetPage() {
     
     if (filtered.length === 0) return renderNoData(true);
     return (
-      <div className="overflow-x-auto border border-slate-700 rounded-lg">
+      <>
+      {/* Mobile card view */}
+      <div className="md:hidden space-y-2.5">
+        {filtered.map((memo: any, i: number) => (
+          <div
+            key={i}
+            id={`row-cash-memo-${memo.drNo}`}
+            onClick={() => handleRowClick("cash-memo", memo._id)}
+            className={cn("rounded-lg border p-3 transition-colors cursor-pointer", isCashMemoMatch(memo, searchQuery) ? "border-[#2388ff]/60 bg-[#2388ff]/10" : "border-slate-700 bg-slate-900/40 active:bg-slate-800/50")}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-white">D.R. {memo.drNo || "—"}</span>
+              <span className="text-base font-bold text-amber-400">{memo.totalAmount || 0}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+              <div><span className="text-slate-500">G.R. No: </span><span className="text-white">{memo.grNo || "—"}</span></div>
+              <div><span className="text-slate-500">Date: </span><span className="text-white">{memo.date ? new Date(memo.date).toLocaleDateString() : "—"}</span></div>
+              <div className="truncate"><span className="text-slate-500">From: </span><span className="text-white">{memo.from || "—"}</span></div>
+              <div className="truncate"><span className="text-slate-500">Consignee: </span><span className="text-white">{memo.consignee || "—"}</span></div>
+              <div><span className="text-slate-500">Freight: </span><span className="text-white">{(memo.freight || 0) + (memo.freightPaise || 0) / 100}</span></div>
+              <div><span className="text-slate-500">Labour: </span><span className="text-white">{(memo.labour || 0) + (memo.labourPaise || 0) / 100}</span></div>
+              <div><span className="text-slate-500">Stationery: </span><span className="text-white">{(memo.stationery || 0) + (memo.stationeryPaise || 0) / 100}</span></div>
+              <div><span className="text-slate-500">Commission: </span><span className="text-white">{(memo.commission || 0) + (memo.commissionPaise || 0) / 100}</span></div>
+              <div><span className="text-slate-500">A.O.C.: </span><span className="text-white">{(memo.aoc || 0) + (memo.aocPaise || 0) / 100}</span></div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Desktop table view */}
+      <div className="hidden md:block overflow-x-auto border border-slate-700 rounded-lg">
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-slate-900/80">
@@ -607,6 +667,7 @@ export default function FleetPage() {
           </tbody>
         </table>
       </div>
+      </>
     );
   };
 
@@ -620,7 +681,49 @@ export default function FleetPage() {
     if (flatRows.length === 0) return renderNoData(false);
     if (filtered.length === 0) return renderNoData(true);
     return (
-      <div className="overflow-x-auto border border-slate-700 rounded-lg">
+      <>
+      {/* Mobile card view */}
+      <div className="md:hidden space-y-2.5">
+        {filtered.map((row: any, i: number) => (
+          <div
+            key={i}
+            id={`row-summary-${row.sno}`}
+            onClick={() => handleRowClick("summary", row._regId, row._entryIdx)}
+            className={cn("rounded-lg border p-3 transition-colors cursor-pointer", isSummaryMatch(row, searchQuery) ? "border-[#2388ff]/60 bg-[#2388ff]/10" : "border-slate-700 bg-slate-900/40 active:bg-slate-800/50")}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-white">Challan {row.challanNo || "—"}</span>
+              <span className="text-base font-bold text-amber-400">{row.grandTotal || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-white font-semibold mb-2">
+              <span className="truncate">{row.from || "—"}</span>
+              <span className="text-slate-500">&rarr;</span>
+              <span className="truncate">{row.to || "—"}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+              <div><span className="text-slate-500">Date: </span><span className="text-white">{row._regDate || "—"}</span></div>
+              <div><span className="text-slate-500">Truck: </span><span className="text-white">{row.truckNo || "—"}</span></div>
+              <div><span className="text-slate-500">Driver: </span><span className="text-white">{row.driverName || "—"}</span></div>
+              <div className="truncate"><span className="text-slate-500">Transport: </span><span className="text-white">{row.transportName || "—"}</span></div>
+              <div><span className="text-slate-500">Fare Del.: </span><span className="text-white">{row.fareDelivery || "—"}</span></div>
+              <div><span className="text-slate-500">Crossing: </span><span className="text-white">{row.crossing || "—"}</span></div>
+              <div><span className="text-slate-500">Cross Fare: </span><span className="text-white">{row.crossingFare || "—"}</span></div>
+              <div><span className="text-slate-500">Labor: </span><span className="text-white">{row.labor || "—"}</span></div>
+              <div><span className="text-slate-500">Del. Comm.: </span><span className="text-white">{row.deliveryCommission || "—"}</span></div>
+              <div><span className="text-slate-500">Credit: </span><span className="text-emerald-400">{row.credit || "—"}</span></div>
+              <div><span className="text-slate-500">Debit: </span><span className="text-rose-400">{row.debit || "—"}</span></div>
+            </div>
+            {(row.note || row.note2) && (
+              <div className="mt-2 pt-2 border-t border-slate-700/60 text-xs text-slate-300 space-y-0.5">
+                {row.note && <div className="truncate"><span className="text-slate-500">Note: </span>{row.note}</div>}
+                {row.note2 && <div className="truncate"><span className="text-slate-500">Note 2: </span>{row.note2}</div>}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {/* Desktop table view */}
+      <div className="hidden md:block overflow-x-auto border border-slate-700 rounded-lg">
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-slate-900/80">
@@ -676,6 +779,7 @@ export default function FleetPage() {
           </tbody>
         </table>
       </div>
+      </>
     );
   };
 
@@ -689,7 +793,38 @@ export default function FleetPage() {
     if (flatRows.length === 0) return renderNoData(false);
     if (filtered.length === 0) return renderNoData(true);
     return (
-      <div className="overflow-x-auto border border-slate-700 rounded-lg">
+      <>
+      {/* Mobile card view */}
+      <div className="md:hidden space-y-2.5">
+        {filtered.map((row: any, i: number) => {
+          const total = (parseFloat(row.freight) || 0) + (parseFloat(row.labour) || 0) + (parseFloat(row.receiptCh) || 0) + (parseFloat(row.dCom) || 0) + (parseFloat(row.demurage) || 0);
+          return (
+            <div
+              key={i}
+              id={`row-delivery-statement-${row.pageNo}`}
+              onClick={() => handleRowClick("delivery-statement", row._regId, row._entryIdx)}
+              className={cn("rounded-lg border p-3 transition-colors cursor-pointer", isDeliveryStatementMatch(row, searchQuery) ? "border-[#2388ff]/60 bg-[#2388ff]/10" : "border-slate-700 bg-slate-900/40 active:bg-slate-800/50")}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-white">D.R. {row.drNo || "—"}</span>
+                <span className="text-base font-bold text-amber-400">{total.toFixed(2)}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                <div><span className="text-slate-500">Date: </span><span className="text-white">{row._regDate || "—"}</span></div>
+                <div><span className="text-slate-500">Page No: </span><span className="text-white">{row.pageNo || "—"}</span></div>
+                <div><span className="text-slate-500">S.No: </span><span className="text-slate-400">{row.sno || "—"}</span></div>
+                <div><span className="text-slate-500">Freight: </span><span className="text-white">{row.freight || "—"}</span></div>
+                <div><span className="text-slate-500">Labour: </span><span className="text-white">{row.labour || "—"}</span></div>
+                <div><span className="text-slate-500">Stationery: </span><span className="text-white">{row.receiptCh || "—"}</span></div>
+                <div><span className="text-slate-500">Commission: </span><span className="text-white">{row.dCom || "—"}</span></div>
+                <div><span className="text-slate-500">A.O.C: </span><span className="text-white">{row.demurage || "—"}</span></div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {/* Desktop table view */}
+      <div className="hidden md:block overflow-x-auto border border-slate-700 rounded-lg">
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-slate-900/80">
@@ -734,6 +869,7 @@ export default function FleetPage() {
           </tbody>
         </table>
       </div>
+      </>
     );
   };
 
@@ -747,7 +883,50 @@ export default function FleetPage() {
     if (flatRows.length === 0) return renderNoData(false);
     if (filtered.length === 0) return renderNoData(true);
     return (
-      <div className="overflow-x-auto border border-slate-700 rounded-lg">
+      <>
+      {/* Mobile card view */}
+      <div className="md:hidden space-y-2.5">
+        {filtered.map((row: any, i: number) => (
+          <div
+            key={i}
+            id={`row-entry-${row.pageNo}`}
+            onClick={() => handleRowClick("entry", row._regId, row._entryIdx)}
+            className={cn("rounded-lg border p-3 transition-colors cursor-pointer", isEntryMatch(row, searchQuery) ? "border-[#2388ff]/60 bg-[#2388ff]/10" : "border-slate-700 bg-slate-900/40 active:bg-slate-800/50")}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-white">G.R. {row.grNo || "—"}</span>
+              <span className={cn(
+                "px-1.5 py-0.5 rounded text-[10px] font-bold uppercase",
+                row.deliveryStatus === "Complete" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+              )}>
+                {row.deliveryStatus || "Pending"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-white font-semibold mb-2">
+              <span className="truncate">{row.from || "—"}</span>
+              <span className="text-slate-500">&rarr;</span>
+              <span className="truncate">{row.to || "—"}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+              <div><span className="text-slate-500">Date: </span><span className="text-white">{row._regDate || "—"}</span></div>
+              <div><span className="text-slate-500">Page No: </span><span className="text-white">{row.pageNo || "—"}</span></div>
+              <div><span className="text-slate-500">Challan: </span><span className="text-white">{row.challanNo || "—"}</span></div>
+              <div><span className="text-slate-500">Vehicle: </span><span className="text-white">{row.vehicleNo || "—"}</span></div>
+              <div><span className="text-slate-500">Driver: </span><span className="text-white">{row.driverName || "—"}</span></div>
+              <div><span className="text-slate-500">S.No.: </span><span className="text-slate-400">{row.sno || "—"}</span></div>
+              <div className="truncate"><span className="text-slate-500">Consignor: </span><span className="text-white">{row.consignor || "—"}</span></div>
+              <div className="truncate"><span className="text-slate-500">Consignee: </span><span className="text-white">{row.consignee || "—"}</span></div>
+              <div><span className="text-slate-500">Pkg: </span><span className="text-white">{row.noOfPackages || "—"}</span></div>
+              <div className="truncate"><span className="text-slate-500">Contents: </span><span className="text-white">{row.contents || "—"}</span></div>
+              <div><span className="text-slate-500">Freight: </span><span className="text-white">{row.freight || "—"}</span></div>
+              <div><span className="text-slate-500">Receipt No: </span><span className="text-white">{row.deliveryReceiptNo || "—"}</span></div>
+              <div><span className="text-slate-500">Del. Date: </span><span className="text-white">{row.dateOfDelivery || "—"}</span></div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Desktop table view */}
+      <div className="hidden md:block overflow-x-auto border border-slate-700 rounded-lg">
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-slate-900/80">
@@ -810,6 +989,7 @@ export default function FleetPage() {
           </tbody>
         </table>
       </div>
+      </>
     );
   };
 
@@ -2189,11 +2369,11 @@ export default function FleetPage() {
       `}</style>
       <div className="space-y-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white">Observation</h2>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Observation</h2>
           <p className="text-muted-foreground">View all records across modules — Challan, Cash Memo, Summary, Delivery Statement, and Entry.</p>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {modules.map(({ key, label, icon, color }) => {
             const isActive = activeModule === key;
             return (

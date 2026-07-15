@@ -333,10 +333,10 @@ export default function ShipmentsPage() {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Shipments</h2>
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Shipments</h2>
             <p className="text-muted-foreground">Manage and track all consignments in real-time.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
 
             <Button variant="outline" size="sm" onClick={() => router.push("/challan")}>
               <FileText className="h-4 w-4 mr-2" /> Challan
@@ -361,7 +361,111 @@ export default function ShipmentsPage() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
+          <CardContent className="p-0">
+            {/* Mobile card view */}
+            <div className="md:hidden divide-y divide-border/50">
+              {filteredShipments.map((shipment: any) => (
+                <div key={shipment._id || shipment.id} className="p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-primary text-xs">{shipment.consignmentNumber || shipment.shipmentId || shipment.id}</span>
+                    <Badge variant="outline" className={cn("px-1.5 py-0 text-[10px]", statusColors[shipment.status] || 'bg-muted text-muted-foreground border-border')}>
+                      {shipment.status || 'Booked'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-foreground font-semibold mb-2">
+                    <span className="truncate">{shipment.consignor?.name || shipment.sender?.name || shipment.sender || '-'}</span>
+                    <span className="text-muted-foreground">&rarr;</span>
+                    <span className="truncate">{shipment.consignee?.name || shipment.receiver?.name || shipment.receiver || '-'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs mb-3">
+                    <div><span className="text-muted-foreground">Vehicle: </span><span className="font-mono font-bold text-foreground/90">{shipment.vehicleNumber || '-'}</span></div>
+                    <div><span className="text-muted-foreground">Branch: </span><span className="text-foreground">{shipment.toBranch || shipment.origin || '-'}</span></div>
+                    <div><span className="text-muted-foreground">Pkg: </span><span className="text-foreground">{shipment.packageType || shipment.dest || '-'}</span></div>
+                    <div><span className="text-muted-foreground">Qty: </span><span className="text-foreground">{shipment.quantity ?? '-'}</span></div>
+                    <div><span className="text-muted-foreground">Chg Wt: </span><span className="text-foreground">{shipment.chargedWeight ?? '-'}</span></div>
+                    <div><span className="text-muted-foreground">Payment: </span><span className="text-foreground">{shipment.paymentMode || '-'}</span></div>
+                    <div><span className="text-muted-foreground">Freight: </span><span className="text-foreground">₹{shipment.totalFreight?.toLocaleString() || '-'}</span></div>
+                    <div>
+                      <span className="text-muted-foreground">Challan: </span>
+                      <button
+                        onClick={() => router.push(`/challan?grNo=${encodeURIComponent(shipment.consignmentNumber || shipment.shipmentId || '')}`)}
+                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase cursor-pointer transition-colors ${
+                          shipment.challanCreated
+                            ? "bg-emerald-900/50 text-emerald-400 hover:bg-emerald-800/60"
+                            : "bg-amber-900/50 text-amber-400 hover:bg-amber-800/60"
+                        }`}
+                      >
+                        {shipment.challanCreated ? "Created" : "Pending"}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={shipment.outgoingStatus || 'Pending'}
+                      onValueChange={(val) => handleOutgoingStatusChange(shipment._id, val)}
+                    >
+                      <SelectTrigger className={cn("h-9 flex-1 text-xs font-semibold border-border/50 bg-transparent", outgoingStatusColors[shipment.outgoingStatus] || 'text-yellow-400')}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {outgoingStatusOptions.map(opt => (
+                          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 hover:bg-primary/20 shrink-0"
+                      onClick={() => { setSelectedShipment(shipment); setViewOpen(true); }}
+                      title="View Details"
+                    >
+                      <Eye className="h-4 w-4 text-primary" />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-secondary shrink-0">
+                          <MoreVertical className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52 z-[9999]">
+                        <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider">Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => { setSelectedShipment(shipment); setViewOpen(true); }}>
+                          <Eye className="h-4 w-4 mr-2 text-primary" /> View Shipment
+                        </DropdownMenuItem>
+                        {can('shipments', 'edit') && (
+                        <DropdownMenuItem onClick={() => { setSelectedShipment(shipment); setEditOpen(true); }}>
+                          <Edit className="h-4 w-4 mr-2 text-yellow-500" /> Edit Shipment
+                        </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => handlePrintReceipt(shipment)}>
+                          <Printer className="h-4 w-4 mr-2 text-foreground" /> Print Receipt
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleSendWhatsApp(shipment)} disabled={sendingWhatsApp === shipment._id}>
+                          {sendingWhatsApp === shipment._id ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin text-green-400" />
+                          ) : (
+                            <MessageCircle className="h-4 w-4 mr-2 text-green-400" />
+                          )}
+                          Send via WhatsApp
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider">Contact Info</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => { setSelectedShipment(shipment); setViewConsignorOpen(true); }}>
+                          <User className="h-4 w-4 mr-2 text-blue-400" /> View Consignor
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setSelectedShipment(shipment); setViewConsigneeOpen(true); }}>
+                          <User className="h-4 w-4 mr-2 text-purple-400" /> View Consignee
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table view */}
+            <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent border-border/50">
@@ -501,6 +605,7 @@ export default function ShipmentsPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 

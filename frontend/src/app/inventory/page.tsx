@@ -189,10 +189,10 @@ export default function InventoryPage() {
           animation: row-blink 1.2s ease-in-out 2 !important;
         }
       `}</style>
-      <div className="space-y-6 px-4 md:px-8 py-4 md:py-8 h-full max-w-full">
+      <div className="space-y-6 h-full max-w-full">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Inventory</h2>
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Inventory</h2>
             <p className="text-muted-foreground">All delivery register records</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -263,8 +263,54 @@ export default function InventoryPage() {
           </div>
         ) : (
           <div className="w-full flex justify-center">
-            <div className="w-full max-w-[1450px] rounded-xl border border-slate-800 bg-[#0b1220] shadow-xl p-8 relative overflow-hidden">
-              <div className="overflow-x-auto border border-slate-700 rounded-md bg-slate-900/40">
+            <div className="w-full max-w-[1450px] rounded-xl border border-slate-800 bg-[#0b1220] shadow-xl p-4 md:p-8 relative overflow-hidden">
+              {/* Mobile card view */}
+              <div className="md:hidden space-y-3">
+                {paginated.map((entry: any, idx: number) => (
+                  <div
+                    key={entry._id || idx}
+                    id={
+                      entry.grNo === highlightVal
+                        ? `row-inventory-${entry.grNo}`
+                        : entry.deliveryReceiptNo === highlightVal
+                        ? `row-inventory-${entry.deliveryReceiptNo}`
+                        : entry.sno === highlightVal
+                        ? `row-inventory-${entry.sno}`
+                        : undefined
+                    }
+                    onClick={() => { setSelectedEntry(entry); setDialogOpen(true); }}
+                    className="rounded-lg border border-slate-700 bg-slate-900/40 p-3 active:bg-slate-800/50 transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono text-xs text-slate-400">#{entry.sno}</span>
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${entry.deliveryStatus === "Complete"
+                          ? "bg-emerald-900/50 text-emerald-400"
+                          : "bg-amber-900/50 text-amber-400"
+                        }`}>
+                        {entry.deliveryStatus}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-white font-semibold mb-2">
+                      <span className="truncate">{entry.from}</span>
+                      <span className="text-slate-500">&rarr;</span>
+                      <span className="truncate">{entry.to}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                      <div><span className="text-slate-500">G.R. No.: </span><span className="font-mono text-white">{entry.grNo}</span></div>
+                      <div><span className="text-slate-500">Packages: </span><span className="text-white">{entry.noOfPackages}</span></div>
+                      <div className="truncate"><span className="text-slate-500">Consignor: </span><span className="text-white">{entry.consignor}</span></div>
+                      <div className="truncate"><span className="text-slate-500">Consignee: </span><span className="text-white">{entry.consignee}</span></div>
+                      <div className="truncate"><span className="text-slate-500">Contents: </span><span className="text-white">{entry.contents}</span></div>
+                      <div><span className="text-slate-500">Freight: </span><span className="font-mono text-white">{entry.freight}</span></div>
+                      <div className="truncate"><span className="text-slate-500">Del. Receipt: </span><span className="font-mono text-white">{entry.deliveryReceiptNo}</span></div>
+                      <div><span className="text-slate-500">Del. Date: </span><span className="text-white">{entry.dateOfDelivery}</span></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop table view */}
+              <div className="hidden md:block overflow-x-auto border border-slate-700 rounded-md bg-slate-900/40">
                 <table className="w-full border-collapse text-xs">
                   <thead>
                     <tr className="bg-slate-800 border-b-2 border-[#2388ff]/60">

@@ -225,7 +225,7 @@ export function ViewContactDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex-shrink-0 px-8 py-5 bg-[#0b1220] border-t border-slate-700/50 flex justify-end gap-3">
+        <div className="flex-shrink-0 px-8 py-5 bg-[#0b1220] border-t border-slate-700/50 flex flex-col sm:flex-row sm:justify-end gap-3">
           {!isEditing ? (
             <>
               <Button 

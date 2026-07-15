@@ -178,11 +178,11 @@ function DashboardHeader({ setWaQRDialogOpen, sidebarOpen, setSidebarOpen }: { s
         </button>
         <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">SKRT CORP</h2>
       </div>
-      <div className="flex-1 flex items-center justify-center px-8">
+      <div className="hidden lg:flex flex-1 items-center justify-center px-8">
         {headerCenter}
       </div>
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-1 relative" ref={dropdownRef}>
+      <div className="flex items-center gap-3 md:gap-6">
+        <div className="hidden md:flex items-center gap-1 relative" ref={dropdownRef}>
           <Input
             type="text"
             placeholder="Quick search…"
@@ -210,7 +210,7 @@ function DashboardHeader({ setWaQRDialogOpen, sidebarOpen, setSidebarOpen }: { s
           )}
 
           {showDropdown && (
-            <div className="absolute top-full left-0 mt-2 w-[480px] bg-zinc-900 border border-zinc-700/60 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50 max-h-[80vh] flex flex-col">
+            <div className="absolute top-full right-0 md:right-auto md:left-0 mt-2 w-[calc(100vw-2rem)] max-w-[480px] md:w-[480px] bg-zinc-900 border border-zinc-700/60 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50 max-h-[80vh] flex flex-col">
 
               {/* ════════════════════════════════════════
                   HINTS PANEL — shown when nothing typed
@@ -438,6 +438,13 @@ export default function DashboardLayout({
     <ProtectedRoute>
       <HeaderProvider>
         <div className="flex min-h-screen bg-background text-foreground">
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 z-40 bg-black/50 md:hidden"
+              onClick={() => setSidebarOpen(false)}
+              aria-hidden="true"
+            />
+          )}
           <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
           <div className="flex-1 md:ml-64 flex flex-col">
             <DashboardHeader setWaQRDialogOpen={setWaQRDialogOpen} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />

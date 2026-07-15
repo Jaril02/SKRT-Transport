@@ -104,7 +104,7 @@ export default function AnalyticsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-black tracking-tight text-white flex items-center gap-2">
+            <h2 className="text-2xl md:text-3xl font-black tracking-tight text-white flex items-center gap-2">
               <BarChart3 className="w-8 h-8 text-[#2388ff]" />
               Business Analysis
             </h2>
@@ -120,7 +120,7 @@ export default function AnalyticsPage() {
         ) : (
           <>
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               {kpiCards.map((card, i) => {
                 const Icon = card.icon;
                 return (
@@ -256,7 +256,38 @@ export default function AnalyticsPage() {
                   <CardTitle className="text-sm font-bold uppercase tracking-wider text-[#2388ff]">Recent Shipments</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="overflow-x-auto">
+                  {/* Mobile card view */}
+                  <div className="md:hidden p-3 space-y-2.5">
+                    {(data?.recentShipments || []).map((s: any) => (
+                      <div key={s._id} className="rounded-lg border border-slate-800 bg-slate-900/40 p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-mono text-[#2388ff] font-bold text-xs">{s.consignmentNumber}</span>
+                          <Badge variant="outline" className={cn("text-[10px] font-bold capitalize", statusColors[s.status] || "")}>
+                            {s.status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-lg font-bold text-white font-mono">₹{(s.totalPayable || 0).toLocaleString()}</span>
+                          <span className="text-slate-500 text-xs font-mono">
+                            {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : "—"}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-3 text-xs">
+                          <div className="truncate"><span className="text-slate-500">Route: </span><span className="text-white">{s.toBranch || "—"}</span></div>
+                          <div className="truncate"><span className="text-slate-500">Consignor: </span><span className="text-slate-300">{s.consignor?.name || "—"}</span></div>
+                        </div>
+                      </div>
+                    ))}
+                    {(!data?.recentShipments || data.recentShipments.length === 0) && (
+                      <div className="px-6 py-10 text-center text-slate-500">
+                        <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        No recent shipments
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Desktop table view */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-slate-800">

@@ -248,11 +248,11 @@ export default function LiveTrackingPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-[1700px] mx-auto p-6 space-y-8 animate-in fade-in duration-500">
+      <div className="max-w-[1700px] mx-auto space-y-8 animate-in fade-in duration-500">
 
         {/* Header Stats */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 flex-1">
             <Card className="p-4 bg-card/40 border-border/40 flex items-center justify-between shadow-sm">
               <div>
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Total Vehicles</p>
@@ -286,7 +286,7 @@ export default function LiveTrackingPage() {
 
           </div>
 
-          <div className="flex items-center gap-3 w-full lg:w-auto relative">
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto relative">
             <div className="flex items-center gap-2 px-3 h-11 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">Live</span>
@@ -370,10 +370,10 @@ export default function LiveTrackingPage() {
         </div>
 
         {/* Browser Like Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start min-h-[800px]">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start min-h-0 md:min-h-[800px]">
 
           {/* SEARCH & LIST */}
-          <Card className="lg:col-span-4 p-5 bg-card/60 backdrop-blur-xl border-border/50 h-[800px] flex flex-col gap-5 overflow-hidden">
+          <Card className="lg:col-span-4 p-5 bg-card/60 backdrop-blur-xl border-border/50 h-[500px] md:h-[800px] flex flex-col gap-5 overflow-hidden">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -472,7 +472,7 @@ export default function LiveTrackingPage() {
                         </div>
                         <div className="space-y-1">
                           <div className="flex items-center gap-3">
-                            <h2 className="text-3xl font-extrabold tracking-tighter">{selectedVehicle.vehicleNumber}</h2>
+                            <h2 className="text-2xl md:text-3xl font-extrabold tracking-tighter">{selectedVehicle.vehicleNumber}</h2>
                             <Badge className={cn("text-xs font-bold px-3 py-1 border uppercase", statusColors[selectedVehicle.statusLabel] || statusColors[selectedVehicle.status])}>
                               {selectedVehicle.statusLabel}
                             </Badge>
@@ -568,7 +568,7 @@ export default function LiveTrackingPage() {
                 </Card>
 
                 {/* Cargo Summary Footer */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   <Card className="p-4 bg-card/60 border-border/40 text-center hover:bg-card/80 transition-colors">
                     <Box className="w-5 h-5 mx-auto mb-2 text-primary" />
                     <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">Cargo Type</p>

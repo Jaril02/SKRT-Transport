@@ -204,7 +204,7 @@ export default function ExpensesPage() {
           className="flex flex-col md:flex-row md:items-center justify-between gap-4"
         >
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">Expense Tracking</h2>
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Expense Tracking</h2>
             <p className="text-muted-foreground text-sm mt-1">
               Monitor and manage all operational expenses
               {hasActiveFilters && (
@@ -214,7 +214,7 @@ export default function ExpensesPage() {
               )}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant={showFilters ? "default" : "outline"}
               size="sm"
@@ -361,7 +361,7 @@ export default function ExpensesPage() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4"
         >
           {/* Total Card */}
           <motion.div custom={0} variants={cardVariants} className="relative group">
@@ -447,8 +447,63 @@ export default function ExpensesPage() {
             </Button>
           </div>
 
-          {/* Table body */}
-          <div className="overflow-x-auto">
+          {/* Mobile card view */}
+          <div className="md:hidden px-3 py-2 space-y-2.5">
+            {loading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-20 rounded-lg shimmer-loading" />
+              ))
+            ) : expenseList.length === 0 ? (
+              <div className="px-5 py-16 text-center">
+                <Receipt className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+                <p className="text-base font-medium text-muted-foreground">No expenses found</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">
+                  {hasActiveFilters ? "Try adjusting your filters." : "Add your first expense to get started."}
+                </p>
+              </div>
+            ) : (
+              expenseList.map((expense, i) => {
+                const cfg = CATEGORY_CONFIG[expense.category];
+                return (
+                  <div
+                    key={expense._id}
+                    onClick={() => setDetailExpense(expense)}
+                    className="rounded-lg border border-border/40 bg-secondary/10 p-3 active:bg-secondary/30 transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center text-xs shrink-0", cfg?.lightBg || "bg-slate-500/10")}>
+                          {cfg?.icon || <Receipt className="w-3.5 h-3.5" />}
+                        </div>
+                        <span className="text-sm font-medium text-foreground truncate">{expense.category}</span>
+                      </div>
+                      <span className={cn(
+                        "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider shrink-0 ml-2",
+                        expense.status === "paid"
+                          ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                          : "bg-amber-500/15 text-amber-400 border border-amber-500/20"
+                      )}>
+                        {expense.status || "paid"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-lg font-bold text-foreground tabular-nums">₹{expense.amount.toLocaleString()}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(expense.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 text-xs">
+                      <div className="truncate"><span className="text-muted-foreground">Vehicle: </span><span className="font-mono text-foreground/80">{expense.vehicle?.vehicleNo || "—"}</span></div>
+                      <div className="truncate"><span className="text-muted-foreground">Desc: </span><span className="text-foreground/80">{expense.description || "—"}</span></div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Table body (desktop) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border/30 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -562,7 +617,7 @@ export default function ExpensesPage() {
 
       {/* Detail Dialog for Other category */}
       <Dialog open={!!detailExpense} onOpenChange={(o) => { if (!o) setDetailExpense(null); }}>
-        <DialogContent className="max-w-[400px]">
+        <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Expense Details</DialogTitle>
           </DialogHeader>
