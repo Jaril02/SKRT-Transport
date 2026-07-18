@@ -67,7 +67,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
       )}
     >
       <div className="p-6 flex justify-between items-center">
-        <a href="/dashboard" className="flex items-center gap-3">
+        <a href="https://skrt-transport.vercel.app/" className="flex items-center gap-3">
           <img src="logobg.png" alt="logo" className="w-25 " />
         </a>
         <button
