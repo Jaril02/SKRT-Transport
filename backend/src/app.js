@@ -142,6 +142,7 @@ app.use('/api/analytics',          require('./modules/analytics/routes'));
 app.use('/api/clients',            require('./modules/clients/routes'));
 app.use('/api/expenses',           require('./modules/expenses/routes'));
 app.use('/api/tracking',           require('./modules/tracking/routes'));
+app.use('/api/public/tracking',    require('./modules/tracking/publicRoutes'));
 app.use('/api/notifications',      require('./modules/notifications/routes'));
 app.use('/api/cash-memo',          require('./modules/cash-memo/routes'));
 app.use('/api/entry',              require('./modules/entry/routes'));

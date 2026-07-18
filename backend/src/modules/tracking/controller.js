@@ -129,6 +129,37 @@ exports.getVehicleLocation = async (req, res) => {
   }
 };
 
+// Unauthenticated lookup for the public landing page. Matches on vehicle or
+// consignment number, ignoring separators ("MH03EW2342" ⇔ "MH-03-EW-2342").
+exports.getPublicTracking = async (req, res) => {
+  try {
+    const normalize = value => String(value || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
+    const query = normalize(req.params.vehicleNumber);
+    if (!query) {
+      return sendResponse(res, 400, false, 'Enter a vehicle number to track.');
+    }
+
+    const data = await buildLiveTrackingData();
+    const vehicle = data.find(v =>
+      normalize(v.vehicleNumber) === query || normalize(v.consignmentNumber) === query
+    );
+    if (!vehicle) {
+      return sendResponse(res, 404, false, 'No tracking data found for that number.');
+    }
+
+    return sendResponse(res, 200, true, 'Vehicle tracking fetched successfully', {
+      ...vehicle,
+      currentStatus: vehicle.statusLabel,
+      route: {
+        origin: vehicle.shipment.origin,
+        destination: vehicle.shipment.destination
+      }
+    });
+  } catch (error) {
+    return sendResponse(res, 500, false, error.message);
+  }
+};
+
 exports.updateLocation = async (req, res) => {
   return sendResponse(res, 200, true, 'Location updates are currently driven by shipment status updates.');
 };
