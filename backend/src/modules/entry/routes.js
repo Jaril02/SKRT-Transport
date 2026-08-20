@@ -3,6 +3,7 @@ const {
   getAllEntries,
   getEntryByDate,
   getEntryByGrNo,
+  getEntryBySno,
   getEntryById,
   createEntry,
   updateEntry,
@@ -29,6 +30,10 @@ router
 router
   .route("/grno/:grNo")
   .get(getEntryByGrNo);
+
+router
+  .route("/sno/:sno")
+  .get(getEntryBySno);
 
 router
   .route("/:id/entries/:entryId")

@@ -60,6 +60,7 @@ export default function EntryRegisterPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initialMaxSno, setInitialMaxSno] = useState<number | null>(null);
+  const [dupGrNos, setDupGrNos] = useState<Set<string>>(new Set());
 
   // Upload state (Excel/CSV)
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -179,11 +180,42 @@ export default function EntryRegisterPage() {
 
   const updateRow = (index: number, field: keyof EntryRow, value: string) => {
     const newRows = [...rows];
+    if (field === 'grNo') {
+      setDupGrNos((prev) => {
+        const next = new Set(prev);
+        next.delete(newRows[index].grNo.trim().toUpperCase());
+        next.delete(value.trim().toUpperCase());
+        return next;
+      });
+    }
     newRows[index] = { ...newRows[index], [field]: value };
     if (field === 'sno') {
       setRows(autoFillSnoFrom(index, newRows));
     } else {
       setRows(newRows);
+    }
+  };
+
+  const checkGrNo = async (grNo: string) => {
+    const n = grNo.trim().toUpperCase();
+    setDupGrNos((prev) => {
+      const next = new Set(prev);
+      next.delete(n);
+      return next;
+    });
+    if (!n) return;
+    const inSheet = rows.filter((r) => r.grNo.trim().toUpperCase() === n).length > 1;
+    if (inSheet) {
+      setDupGrNos((prev) => new Set(prev).add(n));
+      return;
+    }
+    try {
+      const res = await api.get(`/entry/grno/${encodeURIComponent(grNo)}`);
+      if (res.data.success && res.data.data && String(res.data.data.registerId) !== String(registerId)) {
+        setDupGrNos((prev) => new Set(prev).add(n));
+      }
+    } catch {
+      // 404 = not found, not a duplicate
     }
   };
 
@@ -206,6 +238,7 @@ export default function EntryRegisterPage() {
   const clearAll = async () => {
     if (confirm("Clear all entries? This will clear the table rows visually.")) {
       const maxSno = await getMaxSno();
+      setDupGrNos(new Set());
       setRows(Array.from({ length: 5 }, (_, i) => emptyRow(String(maxSno + i + 1))));
       setRegisterId(null);
       setPageNo("");
@@ -423,6 +456,12 @@ export default function EntryRegisterPage() {
   };
 
   const handleSave = async () => {
+    const flagged = [...dupGrNos].filter((n) => rows.some((r) => r.grNo.trim().toUpperCase() === n));
+    if (flagged.length > 0) {
+      const labels = [...new Set(rows.filter((r) => flagged.includes(r.grNo.trim().toUpperCase())).map((r) => r.grNo))];
+      toast.error(`G.R. No "${labels.join('", "')}" already exists. Please fix before saving.`);
+      return;
+    }
     setSaving(true);
     try {
       const localEntries = rows
@@ -458,6 +497,7 @@ export default function EntryRegisterPage() {
       setPageNo("");
       await autoGeneratePageNo();
       const maxSno = await getMaxSno();
+      setDupGrNos(new Set());
       setRows(Array.from({ length: 5 }, (_, i) => emptyRow(String(maxSno + i + 1))));
       toast.success("Ready for new entry.");
     } catch (err: any) {
@@ -474,6 +514,17 @@ export default function EntryRegisterPage() {
       String(val).toLowerCase().includes(lowerQ)
     );
   };
+
+  const previewGrDups = new Set<string>();
+  {
+    const seen = new Set();
+    for (const r of previewRows) {
+      const n = String(r.grNo || "").trim().toUpperCase();
+      if (!n) continue;
+      if (seen.has(n)) previewGrDups.add(n);
+      seen.add(n);
+    }
+  }
 
   return (
     <DashboardLayout>
@@ -605,6 +656,11 @@ export default function EntryRegisterPage() {
               {previewRows.length > 0 && (
                 <>
                   <p className="text-sm text-slate-400 mb-2">{previewRows.length} rows parsed</p>
+                  {previewGrDups.size > 0 && (
+                    <p className="text-xs text-rose-400 bg-rose-950/40 border border-rose-800 rounded px-3 py-2 mb-3">
+                      Duplicate G.R. No detected in file: {[...previewGrDups].join(", ")} - upload will be rejected.
+                    </p>
+                  )}
                   {(uploadPageNo || uploadChallanNo || uploadVehicleNo || uploadDriverName || uploadDateSearch) && (
                     <div className="flex flex-wrap gap-4 mb-3 p-3 bg-slate-900/50 border border-slate-700 rounded text-xs text-slate-300">
                       {uploadDateSearch && <span><strong className="text-[#2388ff]">Date:</strong> {uploadDateSearch}</span>}
@@ -637,7 +693,7 @@ export default function EntryRegisterPage() {
                             <td className="p-2 border border-slate-700 text-center text-slate-300">{row.sno || i + 1}</td>
                             <td className="p-2 border border-slate-700 text-white">{row.from}</td>
                             <td className="p-2 border border-slate-700 text-white">{row.to}</td>
-                            <td className="p-2 border border-slate-700 text-white">{row.grNo}</td>
+                            <td className={`p-2 border border-slate-700 ${previewGrDups.has(String(row.grNo || "").trim().toUpperCase()) ? "text-rose-400 font-bold" : "text-white"}`}>{row.grNo}</td>
                             <td className="p-2 border border-slate-700 text-white max-w-[100px] truncate">{row.consignor}</td>
                             <td className="p-2 border border-slate-700 text-white max-w-[100px] truncate">{row.consignee}</td>
                             <td className="p-2 border border-slate-700 text-white text-center">{row.noOfPackages}</td>
@@ -775,8 +831,11 @@ export default function EntryRegisterPage() {
                       <td className="border border-slate-700 p-0">
                         <input type="text" value={row.to} onChange={(e) => updateRow(idx, 'to', e.target.value)} data-row={idx} data-col={2} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 2)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
                       </td>
-                      <td className="border border-slate-700 p-0">
-                        <input type="text" value={row.grNo} onChange={(e) => updateRow(idx, 'grNo', e.target.value)} data-row={idx} data-col={3} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 3)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />
+                      <td className="border border-slate-700 p-0 relative">
+                        <input type="text" value={row.grNo} onChange={(e) => updateRow(idx, 'grNo', e.target.value)} onBlur={() => checkGrNo(row.grNo)} data-row={idx} data-col={3} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 3)} className={`w-full h-full p-1.5 bg-transparent border-0 outline-none focus:bg-[#2388ff]/10 ${dupGrNos.has(row.grNo.trim().toUpperCase()) ? "text-rose-400" : "text-white"}`} />
+                        {dupGrNos.has(row.grNo.trim().toUpperCase()) && (
+                          <span className="absolute top-full left-0 z-20 mt-0.5 bg-rose-600 text-white text-[10px] px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap">Already exists</span>
+                        )}
                       </td>
                       <td className="border border-slate-700 p-0">
                         <input type="text" value={row.consignor} onChange={(e) => updateRow(idx, 'consignor', e.target.value)} data-row={idx} data-col={4} onKeyDown={(e) => handleTableCellKeyDown(e, idx, 4)} className="w-full h-full p-1.5 bg-transparent border-0 text-white outline-none focus:bg-[#2388ff]/10" />

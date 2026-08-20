@@ -16,7 +16,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-20 h-20  rounded-xl flex items-center justify-center ">
-              <img src="logobg.png" alt="Logo" />
+              <img src="logobg.png" alt="Logo1" />
             </div>
       
           </div>

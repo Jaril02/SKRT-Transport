@@ -436,7 +436,7 @@ export default function PosterStage() {
                           </a>
                           <a
                             className="social-link social-link-facebook"
-                            href="https://www.facebook.com"
+                            href="https://www.facebook.com/share/18yjddfFLM/"
                             target="_blank"
                             rel="noreferrer"
                             aria-label="Open Facebook"

@@ -22,6 +22,7 @@ import {
 import { Plus, Printer, Download } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { PartyAutocomplete } from "@/components/shipments/PartyAutocomplete";
 
 function formatConsignmentNumber(index: number) {
   return `SK-${String(index).padStart(3, '0')}`;
@@ -94,10 +95,11 @@ export function CreateShipmentDialog({
     return Number.isNaN(parsed) ? 0 : parsed;
   };
 
-  const totalFreight = useMemo(
-    () => numericValue(formData.chargedWeight) * numericValue(formData.rate),
-    [formData.chargedWeight, formData.rate]
-  );
+  const totalFreight = useMemo(() => {
+    if (formData.rateType === "Per Pkg") return numericValue(formData.quantity) * numericValue(formData.rate);
+    if (formData.rateType === "Fixed") return numericValue(formData.rate);
+    return numericValue(formData.chargedWeight) * numericValue(formData.rate);
+  }, [formData.chargedWeight, formData.quantity, formData.rateType, formData.rate]);
 
   const totalPayable = useMemo(
     () =>
@@ -519,11 +521,14 @@ export function CreateShipmentDialog({
 
             <div className="col-span-1 space-y-3">
               <Label className="text-sm font-semibold">Consignor Name</Label>
-              <Input
+              <PartyAutocomplete
+                role="consignor"
                 value={formData.consignorName}
-                onChange={(e) => setFormData({ ...formData, consignorName: e.target.value })}
+                onChange={(v) => setFormData({ ...formData, consignorName: v })}
+                onSelectSuggestion={(name, gst) =>
+                  setFormData({ ...formData, consignorName: name, consignorGst: gst })
+                }
                 placeholder="Consignor Name"
-                className="h-11 w-full rounded-lg"
               />
             </div>
 
@@ -539,11 +544,14 @@ export function CreateShipmentDialog({
 
             <div className="col-span-1 space-y-3">
               <Label className="text-sm font-semibold">Consignee Name</Label>
-              <Input
+              <PartyAutocomplete
+                role="consignee"
                 value={formData.consigneeName}
-                onChange={(e) => setFormData({ ...formData, consigneeName: e.target.value })}
+                onChange={(v) => setFormData({ ...formData, consigneeName: v })}
+                onSelectSuggestion={(name, gst) =>
+                  setFormData({ ...formData, consigneeName: name, consigneeGst: gst })
+                }
                 placeholder="Consignee Name"
-                className="h-11 w-full rounded-lg"
               />
             </div>
 
@@ -670,7 +678,7 @@ export function CreateShipmentDialog({
               <Label className="text-sm font-semibold">Rate Type</Label>
               <Select
                 value={formData.rateType}
-                onValueChange={(value) => setFormData({ ...formData, rateType: value })}
+                onValueChange={(value) => setFormData({ ...formData, rateType: value, rate: value === "Fixed" ? "0" : formData.rate })}
               >
                 <SelectTrigger className="h-11 w-full rounded-lg">
                   <SelectValue placeholder="Select Type" />

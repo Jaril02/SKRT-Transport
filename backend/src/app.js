@@ -61,23 +61,25 @@ app.set('trust proxy', 1);
 app.use(helmet());
 
 // CORS
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  process.env.FRONTEND_URL
-].filter(Boolean);
+  const allowedOrigins = [
+    'https://www.skrt.company',
+    'https://skrt.company',
+    'https://skrt-final.vercel.app',
+    'http://localhost:3001'
+  ];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-    // Allow any vercel.app subdomain (covers all Vercel preview + production deployments)
-    if (origin.endsWith('.vercel.app')) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true
-}));
+  app.use(cors({
+    origin: function (origin, callback) {
+      // Allows requests with no origin (like mobile apps, curl, Postman) 
+      // or requests matching allowedOrigins
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Blocked by CORS policy'));
+      }
+    },
+    credentials: true
+  }));
 
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));

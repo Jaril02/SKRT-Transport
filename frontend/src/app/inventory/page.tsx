@@ -10,7 +10,6 @@ import { ViewEditEntryDialog } from "@/components/entry/ViewEditEntryDialog";
 
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { fetchCashMemoTemplate, fillCashMemoTemplate } from "@/lib/cash-memo-template";
 
 const PER_PAGE = 30;
 
@@ -83,7 +82,9 @@ export default function InventoryPage() {
     return sorted.filter(e =>
       String(e.sno || "").toLowerCase().includes(q) ||
       String(e.grNo || "").toLowerCase().includes(q) ||
-      String(e.deliveryReceiptNo || "").toLowerCase().includes(q)
+      String(e.deliveryReceiptNo || "").toLowerCase().includes(q) ||
+      String(e.consignor || "").toLowerCase().includes(q) ||
+      String(e.consignee || "").toLowerCase().includes(q)
     );
   }, [allEntries, searchQuery, localSearch]);
 
@@ -117,35 +118,6 @@ export default function InventoryPage() {
   const paginated = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
   useEffect(() => { setPage(1); }, [searchQuery]);
-
-  const handlePrintCashMemo = async () => {
-    const template = await fetchCashMemoTemplate();
-    const html = fillCashMemoTemplate(template, {
-      drNo: "DR-___",
-      grNo: "",
-      date: "",
-      receivedOn: "",
-      from: "",
-      consignee: "",
-      through: "",
-      freight: "",
-      freightP: "",
-      labour: "",
-      labourP: "",
-      stationery: "5",
-      stationeryP: "00",
-      commission: "",
-      commissionP: "",
-      aoc: "5",
-      aocP: "00",
-      total: "",
-      totalP: "00",
-    });
-    const pw = window.open("", "_blank");
-    if (!pw) return;
-    pw.document.write(html);
-    pw.document.close();
-  };
 
   const exportCSV = () => {
     const headers = ["S.No.", "From", "To", "G. R. No.", "Consignor", "Consignee", "No. of Packages", "Contents", "Freight", "Delivery Receipt No.", "Date of Delivery", "Delivery Status"];

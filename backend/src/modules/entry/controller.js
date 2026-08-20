@@ -1,5 +1,44 @@
 const EntryRegister = require("./model");
 
+const normalizeGrNo = (v) => String(v || "").trim().toUpperCase();
+
+const findDuplicateGrNos = async (grNos, excludeRegisterId) => {
+  const set = new Set(grNos.map(normalizeGrNo).filter(Boolean));
+  if (set.size === 0) return [];
+  const matches = await EntryRegister.find({ "entries.grNo": { $in: [...set] } });
+  const dups = [];
+  for (const reg of matches) {
+    if (excludeRegisterId && String(reg._id) === String(excludeRegisterId)) continue;
+    for (const e of reg.entries || []) {
+      if (set.has(normalizeGrNo(e.grNo))) {
+        dups.push({ grNo: e.grNo, pageNo: reg.pageNo, dateSearch: reg.dateSearch });
+      }
+    }
+  }
+  return dups;
+};
+
+const findInSheetDuplicates = (entries) => {
+  const seen = new Set();
+  const dups = [];
+  for (const e of entries || []) {
+    const n = normalizeGrNo(e.grNo);
+    if (!n) continue;
+    if (seen.has(n)) dups.push({ grNo: e.grNo, inSheet: true });
+    else seen.add(n);
+  }
+  return dups;
+};
+
+const dupMessage = (dupes) => {
+  const parts = dupes.map((d) =>
+    d.inSheet
+      ? `G.R. No "${d.grNo}" appears twice in this sheet`
+      : `G.R. No "${d.grNo}" already exists (Page ${d.pageNo || "—"}${d.dateSearch ? `, Date ${d.dateSearch}` : ""})`
+  );
+  return [...new Set(parts)].join(". ");
+};
+
 /**
  * Get all Entry Registers
  */
@@ -33,6 +72,14 @@ exports.getEntryByDate = async (req, res) => {
  */
 exports.createEntry = async (req, res) => {
   try {
+    const entries = req.body.entries || [];
+    const dupes = [
+      ...(await findDuplicateGrNos(entries.map((e) => e.grNo))),
+      ...findInSheetDuplicates(entries)
+    ];
+    if (dupes.length > 0) {
+      return res.status(400).json({ success: false, message: dupMessage(dupes) });
+    }
     const newRecord = await EntryRegister.create(req.body);
     res.status(201).json({ success: true, data: newRecord });
   } catch (error) {
@@ -72,10 +119,32 @@ exports.getEntryByGrNo = async (req, res) => {
   }
 };
 
+/**
+ * Get Entry by S.No.
+ */
+exports.getEntryBySno = async (req, res) => {
+  try {
+    const { sno } = req.params;
+    const record = await EntryRegister.findOne({ 'entries.sno': sno }).sort({ createdAt: -1 });
+    if (!record) {
+      return res.status(404).json({ success: false, message: "No entry found for this S.No." });
+    }
+    const entry = record.entries.find(e => e.sno === sno);
+    res.json({ success: true, data: { ...entry.toObject(), registerId: record._id, registerDate: record.dateSearch, registerPage: record.pageNo } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: "Server Error", message: error.message });
+  }
+};
+
 exports.updateEntry = async (req, res) => {
   try {
     console.log('Update Request ID:', req.params.id);
     const { id } = req.params;
+    const entries = req.body.entries || [];
+    const dupes = await findDuplicateGrNos(entries.map((e) => e.grNo), id);
+    if (dupes.length > 0) {
+      return res.status(400).json({ success: false, message: dupMessage(dupes) });
+    }
     const updatedRecord = await EntryRegister.findByIdAndUpdate(
       id,
       req.body,
@@ -104,6 +173,15 @@ exports.bulkUploadEntries = async (req, res) => {
 
     // Assign sequential S.No starting from the next available
     let existing = await EntryRegister.findOne({ dateSearch });
+
+    const dupes = [
+      ...(await findDuplicateGrNos(entries.map((e) => e.grNo))),
+      ...findInSheetDuplicates(entries)
+    ];
+    if (dupes.length > 0) {
+      return res.status(400).json({ success: false, message: dupMessage(dupes) });
+    }
+
     let nextSno = 1;
     if (existing) {
       const maxSno = (existing.entries || []).reduce((max, e) => {
@@ -163,6 +241,11 @@ exports.updateSingleEntry = async (req, res) => {
       updateData.deliveryStatus = "Complete";
     } else {
       updateData.deliveryStatus = "Pending";
+    }
+
+    const dupes = await findDuplicateGrNos([updateData.grNo], id);
+    if (dupes.length > 0) {
+      return res.status(400).json({ success: false, message: dupMessage(dupes) });
     }
 
     const record = await EntryRegister.findOneAndUpdate(

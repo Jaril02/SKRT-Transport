@@ -11,6 +11,18 @@ const getLocalDateString = (dateObj) => {
   return `${year}-${month}-${day}`;
 };
 
+const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const findMemoByGrNo = (grNo, excludeId) => {
+  const trimmed = String(grNo || '').trim();
+  if (!trimmed) return null;
+  const filter = {
+    grNo: { $regex: new RegExp('^' + escapeRegExp(trimmed) + '$', 'i') }
+  };
+  if (excludeId) filter._id = { $ne: excludeId };
+  return CashMemo.findOne(filter);
+};
+
 const syncDeliveryStatementForDate = async (dateStr) => {
   try {
     const start = new Date(`${dateStr}T00:00:00.000Z`);
@@ -124,6 +136,11 @@ const syncDeliveryStatementForDate = async (dateStr) => {
 // @access  Private
 exports.createCashMemo = async (req, res) => {
   try {
+    const dup = await findMemoByGrNo(req.body.grNo);
+    if (dup) {
+      return sendResponse(res, 400, false, `Cash memo already exists for this G.R. No (D.R. No ${dup.drNo || '—'}). No new cash memo can be created for the same G.R. No.`);
+    }
+
     const memo = await CashMemo.create({
       ...req.body,
       date: req.body.date ? new Date(req.body.date) : Date.now(),
@@ -188,6 +205,15 @@ exports.updateCashMemo = async (req, res) => {
   try {
     const oldMemo = await CashMemo.findById(req.params.id);
     if (!oldMemo) return sendResponse(res, 404, false, 'Cash memo not found');
+
+    const newGrNo = String(req.body.grNo || '').trim();
+    const oldGrNo = String(oldMemo.grNo || '').trim();
+    if (newGrNo && newGrNo.toUpperCase() !== oldGrNo.toUpperCase()) {
+      const dup = await findMemoByGrNo(newGrNo, req.params.id);
+      if (dup) {
+        return sendResponse(res, 400, false, `Cash memo already exists for this G.R. No (D.R. No ${dup.drNo || '—'}).`);
+      }
+    }
 
     const memo = await CashMemo.findByIdAndUpdate(
       req.params.id,

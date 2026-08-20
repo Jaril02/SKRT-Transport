@@ -338,12 +338,6 @@ export default function SummaryPage() {
               Save
             </Button>
 
-            <Button size="sm" onClick={handleSaveAndPrint} disabled={saving}
-              className="h-9 px-4 rounded-lg font-semibold transition-all bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-600"
-            >
-              <Save className="h-4 w-4 mr-1.5" /> Save & Print
-            </Button>
-
             <Button size="sm" onClick={deleteLastRow} className="h-9 px-3 rounded-lg bg-slate-800 text-slate-200 hover:bg-orange-600 hover:text-white border border-slate-700 font-medium transition-all">
               <Trash2 className="h-4 w-4 mr-1" /> Del Last
             </Button>
@@ -613,6 +607,15 @@ export default function SummaryPage() {
             <Plus className="h-4 w-4 group-hover/add:rotate-90 transition-transform duration-300" />
             Add New Summary Slip
           </button>
+        </div>
+
+        {/* ── Save & Print ── */}
+        <div className="flex justify-center">
+          <Button size="sm" onClick={handleSaveAndPrint} disabled={saving}
+            className="h-9 px-4 rounded-lg font-semibold transition-all bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-600"
+          >
+            <Save className="h-4 w-4 mr-1.5" /> Save & Print
+          </Button>
         </div>
       </div>
     </DashboardLayout>

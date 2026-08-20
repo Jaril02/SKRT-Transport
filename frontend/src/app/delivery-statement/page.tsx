@@ -406,10 +406,6 @@ export default function DeliveryStatementPage() {
               Save
             </Button>
 
-            <Button size="sm" onClick={handleSaveAndPrint} disabled={saving} className="h-9 px-4 rounded-lg font-semibold transition-all bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-600">
-              <Save className="h-4 w-4 mr-2" /> Save & Print
-            </Button>
-
             <Button size="sm" onClick={deleteLastRow} className="h-9 px-3 rounded-lg bg-slate-800 text-slate-200 hover:bg-orange-600 hover:text-white border border-slate-700 font-medium transition-all">
               <Trash2 className="h-4 w-4 mr-1.5" /> Delete Last
             </Button>
@@ -540,6 +536,13 @@ export default function DeliveryStatementPage() {
             </div>
 
           </div>
+        </div>
+
+        {/* Save & Print */}
+        <div className="flex justify-center">
+          <Button size="sm" onClick={handleSaveAndPrint} disabled={saving} className="h-9 px-4 rounded-lg font-semibold transition-all bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-600">
+            <Save className="h-4 w-4 mr-2" /> Save & Print
+          </Button>
         </div>
       </div>
     </DashboardLayout>

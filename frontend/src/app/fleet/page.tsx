@@ -1191,7 +1191,7 @@ export default function FleetPage() {
                 </tr>
               </thead>
               <tbody>
-                {(previewEntryIndex !== null && previewData.entries ? [previewData.entries[previewEntryIndex]] : previewData.entries || []).map((e: any, idx: number) => (
+                {(previewData.entries || []).map((e: any, idx: number) => (
                   <tr key={idx} className="hover:bg-slate-800/30">
                     <td className="p-2 border border-slate-800 text-center text-slate-400">{e.sno || idx + 1}</td>
                     <td className="p-2 border border-slate-800 text-center text-white">{e.grNo || "—"}</td>
@@ -1230,7 +1230,7 @@ export default function FleetPage() {
                 setSendingWa(true);
                 try {
                   const template = await fetchTemplate("challan");
-                  const entries = previewEntryIndex !== null && previewData.entries ? [previewData.entries[previewEntryIndex]] : previewData.entries || [];
+                  const entries = previewData.entries || [];
                   const r = (v: any) => v || "";
                   const formatDate = (ds: string) => {
                     if (!ds) return "";
@@ -1321,7 +1321,7 @@ export default function FleetPage() {
             <div className="flex items-center gap-2 border-b border-slate-800 pb-1">
               <span className="font-bold text-[#2388ff] text-sm w-[80px]">G.R. No.</span>
               <span className="flex-1 border-b border-dashed border-slate-700 pb-0.5 text-white">{previewData.grNo || "—"}</span>
-              <span className="font-bold text-[#2388ff] text-sm whitespace-nowrap px-2">Received on</span>
+              <span className="font-bold text-[#2388ff] text-sm whitespace-nowrap px-2">Serial no</span>
               <span className="w-[200px] border-b border-dashed border-slate-700 pb-0.5 text-white text-right">{previewData.receivedOn || "—"}</span>
             </div>
             <div className="flex items-center gap-2 border-b border-slate-800 pb-1">
@@ -1747,7 +1747,7 @@ export default function FleetPage() {
 
     let content = "";
     if (previewModule === "challan") {
-      const entriesForPrint = previewEntryIndex !== null && previewData.entries ? [previewData.entries[previewEntryIndex]] : previewData.entries || [];
+      const entriesForPrint = previewData.entries || [];
       const r = (v: any) => v || "";
       const formatDate = (ds: string) => {
         if (!ds) return "";
@@ -1852,6 +1852,7 @@ export default function FleetPage() {
         <div class="totals-item"><div>Grand Total (Rs.)</div><div class="num">${grandTotal.toFixed(2)}</div></div>
     </div>
     <div style="font-size:11px;margin-bottom:12px;padding:8px 12px;border:1px solid #ccc;border-radius:4px;">
+        <div style="padding:3px 0;"><strong>Commission :</strong> ${r(c.commission)}</div>
         <div style="padding:3px 0;"><strong>Truck Freight:</strong> ${r(c.truckFreight)}</div>
         <div style="padding:3px 0;"><strong>Advance:</strong> ${r(c.advance)}</div>
         <div style="padding:3px 0;"><strong>T.F Credit:</strong> ${r(c.tfCredit)}</div>
@@ -1930,7 +1931,7 @@ export default function FleetPage() {
     <div class="form-line">
         <div class="label">G.R. No.</div>
         <div class="input-line">${r2(previewData.grNo)}</div>
-        <div style="width:110px;text-align:right;font-weight:bold;white-space:nowrap;padding-right:6px;">Received on</div>
+        <div style="width:110px;text-align:right;font-weight:bold;white-space:nowrap;padding-right:6px;">Serial no</div>
         <div class="input-line" style="width:200px;flex-shrink:0;">${r2(previewData.receivedOn)}</div>
     </div>
     <div class="form-line">

@@ -37,15 +37,6 @@ const initialForm = {
   aocPaise: "",
 };
 
-type AmountField = "freight" | "labour" | "stationery" | "commission" | "aoc";
-const amountFields: { key: AmountField; label: string }[] = [
-  { key: "freight", label: "Freight" },
-  { key: "labour", label: "Labour" },
-  { key: "stationery", label: "Stationery" },
-  { key: "commission", label: "Commission" },
-  { key: "aoc", label: "A.O.C." },
-];
-
 export default function CashMemoPage() {
   const router = useRouter();
   const [form, setForm] = useState(initialForm);
@@ -54,14 +45,27 @@ export default function CashMemoPage() {
   const [sendingWa, setSendingWa] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
-  const totalRs = amountFields.reduce((sum, f) => sum + (parseFloat(form[f.key] as string) || 0), 0);
-  const totalWhole = Math.floor(totalRs);
-  const totalPaise = Math.round((totalRs - totalWhole) * 100);
+  const totalRs = (
+    (parseFloat(form.freight) || 0) +
+    (parseFloat(form.freightPaise) || 0) / 100 +
+    (parseFloat(form.labour) || 0) +
+    (parseFloat(form.labourPaise) || 0) / 100 +
+    (parseFloat(form.stationery) || 0) +
+    (parseFloat(form.stationeryPaise) || 0) / 100 +
+    (parseFloat(form.commission) || 0) +
+    (parseFloat(form.commissionPaise) || 0) / 100 +
+    (parseFloat(form.aoc) || 0) +
+    (parseFloat(form.aocPaise) || 0) / 100
+  ).toFixed(2);
+  const totalWhole = Math.floor(parseFloat(totalRs));
+  const totalPaise = Math.round((parseFloat(totalRs) - totalWhole) * 100);
 
   const set = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
   const [fetchingGr, setFetchingGr] = useState(false);
+  const [grNoExists, setGrNoExists] = useState<string | null>(null);
+  const [fetchingSno, setFetchingSno] = useState(false);
 
   const getNextDrNo = async () => {
     try {
@@ -89,7 +93,7 @@ export default function CashMemoPage() {
   }, []);
 
   useEffect(() => {
-    if (!form.grNo.trim()) return;
+    if (!form.grNo.trim()) { setGrNoExists(null); return; }
     const timer = setTimeout(async () => {
       setFetchingGr(true);
       try {
@@ -107,6 +111,14 @@ export default function CashMemoPage() {
         }
       } catch {
         // not found – ignore
+      }
+      try {
+        const { data } = await api.get(`/cash-memo/grno/${encodeURIComponent(form.grNo.trim())}`);
+        if (data.success) {
+          setGrNoExists(data.data.drNo || "a cash memo");
+        }
+      } catch {
+        setGrNoExists(null);
       } finally {
         setFetchingGr(false);
       }
@@ -114,9 +126,39 @@ export default function CashMemoPage() {
     return () => clearTimeout(timer);
   }, [form.grNo]);
 
+  useEffect(() => {
+    if (!form.receivedOn?.trim()) return;
+    const timer = setTimeout(async () => {
+      setFetchingSno(true);
+      try {
+        const { data } = await api.get(`/entry/sno/${encodeURIComponent(form.receivedOn.trim())}`);
+        if (data.success) {
+          const e = data.data;
+          setForm(prev => ({
+            ...prev,
+            grNo: e.grNo || prev.grNo,
+            from: e.from || prev.from,
+            consignee: e.consignee || prev.consignee,
+            freight: e.freight || prev.freight,
+          }));
+          toast.success("Entry data loaded for Received On (S.No.)");
+        }
+      } catch {
+        // not found – ignore
+      } finally {
+        setFetchingSno(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [form.receivedOn]);
+
   const handleSave = async () => {
     if (!form.drNo.trim()) { toast.error("D.R. No. is required"); return false; }
     if (!form.date) { toast.error("Date is required"); return false; }
+    if (grNoExists) {
+      toast.error(`Cash memo (${grNoExists}) already exists for G.R. No ${form.grNo.trim()}. No new cash memo can be created for the same G.R. No.`);
+      return false;
+    }
     setSaving(true);
     try {
       await api.post("/cash-memo", {
@@ -131,7 +173,7 @@ export default function CashMemoPage() {
         commissionPaise: parseFloat(form.commissionPaise) || 0,
         aoc: parseFloat(form.aoc) || 0,
         aocPaise: parseFloat(form.aocPaise) || 0,
-        totalAmount: totalRs,
+        totalAmount: parseFloat(totalRs),
       });
       toast.success("Cash memo saved successfully!");
 
@@ -174,10 +216,15 @@ export default function CashMemoPage() {
 
   const buildCashMemoHtml = async (): Promise<string> => {
     const template = await fetchCashMemoTemplate();
+    const fmtDate = (ds: string) => {
+      if (!ds) return "";
+      const p = ds.split("T")[0].split("-");
+      return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : ds;
+    };
     return fillCashMemoTemplate(template, {
       drNo: form.drNo,
       grNo: form.grNo,
-      date: form.date,
+      date: fmtDate(form.date),
       receivedOn: form.receivedOn,
       from: form.from,
       consignee: form.consignee,
@@ -216,9 +263,12 @@ export default function CashMemoPage() {
   };
 
   const handleSaveAndPrint = async () => {
+    const pw = window.open("", "_blank");
     const success = await handleSave();
-    if (success) {
-      handlePrint();
+    if (success && pw) {
+      const html = await buildCashMemoHtml();
+      pw.document.write(html);
+      pw.document.close();
     }
   };
 
@@ -300,14 +350,6 @@ export default function CashMemoPage() {
             </Button>
             <Button
               size="sm"
-              onClick={handleSaveAndPrint}
-              disabled={saving}
-              className="h-9 px-5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-2 transition-all"
-            >
-              <Save className="h-4 w-4" /> Save & Print
-            </Button>
-            <Button
-              size="sm"
               onClick={handleDownloadPDF}
               className="h-9 px-5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold flex items-center gap-2 transition-all"
             >
@@ -346,7 +388,7 @@ export default function CashMemoPage() {
                     value={form.drNo}
                     onChange={(e) => set("drNo", e.target.value)}
                     maxLength={10}
-                    className="w-24 border-0 border-b-2 border-[#2388ff] bg-transparent text-white font-bold text-center text-sm outline-none"
+                    className="w-24 border-0 border-b border-[#2388ff] bg-transparent text-white font-bold text-center text-sm outline-none"
                   />
                 </div>
                 <div className="flex-1 text-center leading-tight">
@@ -355,8 +397,8 @@ export default function CashMemoPage() {
                   </div>
                 </div>
                 <div className="font-size:11px; font-weight:bold; text-align: right; color:#000000; line-height: 1.4; padding-right: 10px; white-space: nowrap;">
-                    <span>Mob.: 96809-92567</span><br/>
-                    <span>Mob.: 86196-06627</span>
+                  <span>Mob.: 96809-92567</span><br/>
+                  <span>Mob.: 86196-06627</span>
                 </div>
               </div>
 
@@ -377,9 +419,14 @@ export default function CashMemoPage() {
                 {/* Left: Form fields */}
                 <div className="flex-1 pr-6 space-y-4">
                   <div className="grid grid-cols-2 gap-x-6">
-                    <div className="flex items-end gap-2">
-                      <span className="text-sm font-bold text-[#2388ff] whitespace-nowrap min-w-[70px]">G.R. No.</span>
-                      <input value={form.grNo} onChange={(e) => set("grNo", e.target.value)} placeholder="GR-4521" className="flex-1 border-0 border-b border-blue-800 bg-transparent text-sm text-white outline-none px-1 py-1 min-w-0 placeholder:text-slate-500 placeholder:italic" />
+                    <div className="flex flex-col">
+                      <div className="flex items-end gap-2">
+                        <span className={`text-sm font-bold whitespace-nowrap min-w-[70px] ${grNoExists ? "text-rose-400" : "text-[#2388ff]"}`}>G.R. No.</span>
+                        <input value={form.grNo} onChange={(e) => set("grNo", e.target.value)} placeholder="GR-4521" className={`flex-1 border-0 border-b bg-transparent text-sm outline-none px-1 py-1 min-w-0 placeholder:text-slate-500 placeholder:italic ${grNoExists ? "border-rose-500 text-rose-400" : "border-blue-800 text-white"}`} />
+                      </div>
+                      {grNoExists && (
+                        <p className="text-[10px] text-rose-400 mt-1">Cash memo ({grNoExists}) already exists for this G.R. No - cannot create another.</p>
+                      )}
                     </div>
                     <div className="flex items-end gap-2">
                       <span className="text-sm font-bold text-[#2388ff] whitespace-nowrap min-w-[30px]">Dt</span>
@@ -387,7 +434,7 @@ export default function CashMemoPage() {
                     </div>
                   </div>
                   {[
-                    { key: "receivedOn", label: "Received on", placeholder: "Truck / Vehicle No." },
+                    { key: "receivedOn", label: "Serial no", placeholder: "Truck / Vehicle No." },
                     { key: "from", label: "From", placeholder: "Origin city / station" },
                     { key: "consignee", label: "Consignee", placeholder: "Recipient name & address" },
                     { key: "through", label: "Through", placeholder: "Via / Agent name" },
@@ -402,6 +449,7 @@ export default function CashMemoPage() {
                       />
                     </div>
                   ))}
+
                 </div>
 
                 {/* Right: Amount table */}
@@ -416,7 +464,13 @@ export default function CashMemoPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {amountFields.map(({ key, label }) => (
+                      {[
+                        { key: "freight", label: "Freight" },
+                        { key: "labour", label: "Labour" },
+                        { key: "stationery", label: "Stationery" },
+                        { key: "commission", label: "Commission" },
+                        { key: "aoc", label: "A.O.C." },
+                      ].map(({ key, label }) => (
                         <tr key={key}>
                           <td className="lbl border border-slate-700 px-2 py-1 font-semibold text-slate-300 text-left">{label}</td>
                           <td className="border border-slate-700 px-1 py-1 bg-slate-900/50">
@@ -465,6 +519,18 @@ export default function CashMemoPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Save & Print */}
+        <div className="flex justify-center">
+          <Button
+            size="sm"
+            onClick={handleSaveAndPrint}
+            disabled={saving}
+            className="h-9 px-5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-2 transition-all"
+          >
+            <Save className="h-4 w-4" /> Save & Print
+          </Button>
         </div>
       </div>
     </DashboardLayout>

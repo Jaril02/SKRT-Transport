@@ -41,7 +41,11 @@ exports.createShipment = async (req, res) => {
       hamali, stationaryCharge, miscellaneousCharge, status, vehicleNumber, outgoingStatus
     } = req.body;
 
-    const computedTotalFreight = parseNumber(chargedWeight) * parseNumber(rate);
+    const computedTotalFreight = rateType === 'Per Pkg'
+      ? parseNumber(quantity) * parseNumber(rate)
+      : rateType === 'Fixed'
+      ? parseNumber(rate)
+      : parseNumber(chargedWeight) * parseNumber(rate);
     const computedTotalPayable = computedTotalFreight +
       parseNumber(hamali) + parseNumber(stationaryCharge) + parseNumber(miscellaneousCharge);
 
@@ -93,6 +97,41 @@ exports.getByConsignmentNumber = async (req, res) => {
       return sendResponse(res, 404, false, 'Shipment not found');
     }
     return sendResponse(res, 200, true, 'Shipment fetched successfully', shipment);
+  } catch (error) {
+    return sendResponse(res, 500, false, error.message);
+  }
+};
+
+// @desc    Get party (consignor/consignee) suggestions by name prefix
+// @route   GET /api/shipments/parties?q=&role=
+// @access  Private
+exports.getPartySuggestions = async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    const role = req.query.role === 'consignor' ? 'consignor' : req.query.role === 'consignee' ? 'consignee' : null;
+    const regex = new RegExp(`^${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
+
+    const filter = role
+      ? { [`${role}.name`]: regex }
+      : { $or: [{ 'consignor.name': regex }, { 'consignee.name': regex }] };
+
+    const shipments = await Shipment.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .select('consignor consignee')
+      .lean();
+
+    const parties = new Map();
+    for (const s of shipments) {
+      for (const side of ['consignor', 'consignee']) {
+        const p = s[side];
+        if (p && p.name && regex.test(p.name) && !parties.has(p.name)) {
+          parties.set(p.name, { name: p.name, gst: p.gst || '' });
+        }
+      }
+    }
+
+    return sendResponse(res, 200, true, 'Party suggestions fetched', Array.from(parties.values()).slice(0, 10));
   } catch (error) {
     return sendResponse(res, 500, false, error.message);
   }
@@ -204,7 +243,11 @@ exports.updateShipment = async (req, res) => {
     }
 
     // Recompute totals
-    shipment.totalFreight  = shipment.chargedWeight * shipment.rate;
+    shipment.totalFreight  = shipment.rateType === 'Per Pkg'
+      ? shipment.quantity * shipment.rate
+      : shipment.rateType === 'Fixed'
+      ? shipment.rate
+      : shipment.chargedWeight * shipment.rate;
     shipment.totalPayable  = shipment.totalFreight + shipment.hamali +
                              shipment.stationaryCharge + shipment.miscellaneousCharge;
     shipment.updatedAt     = Date.now();
